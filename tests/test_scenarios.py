@@ -142,6 +142,46 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["label_summary"]["anomalous_rows"], 3)
         self.assertEqual(payload["label_summary"]["anomaly_counts"]["scale"], 3)
 
+    def test_generate_scenario_is_deterministic_for_seed(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "deterministic_generate",
+                "seed": 23,
+                "row_count": 10,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "three_scales",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 3,
+                        },
+                        "mutation": {
+                            "kind": "offset",
+                            "min_amount": 3.0,
+                            "max_amount": 5.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        first = generate_scenario(request)
+        second = generate_scenario(request)
+
+        self.assertEqual(first, second)
+
     def test_generate_scenario_rejects_count_selection_above_row_count(self):
         request = ScenarioGenerateRequest.model_validate(
             {
@@ -255,6 +295,45 @@ class ScenarioEngineTest(unittest.TestCase):
 
         self.assertTrue(payload["row"]["__is_anomaly"])
         self.assertEqual(payload["row"]["__labels"][0]["selection_kind"], "count")
+
+    def test_sample_scenario_is_deterministic_for_seed(self):
+        request = ScenarioSampleRequest.model_validate(
+            {
+                "name": "deterministic_sample",
+                "seed": 5,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 7.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "single_pick",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 1,
+                        },
+                        "mutation": {
+                            "kind": "scale",
+                            "min_factor": 1.5,
+                            "max_factor": 2.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        first = sample_scenario(request)
+        second = sample_scenario(request)
+
+        self.assertEqual(first, second)
 
     def test_sample_scenario_rejects_count_selection_above_row_count(self):
         request = ScenarioSampleRequest.model_validate(
@@ -385,6 +464,17 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["scenario_name"], "transaction_benchmark")
         self.assertEqual(payload["row_count"], 12)
         self.assertIn("amount", payload["fields"])
+
+    def test_preset_generate_is_deterministic_for_seed(self):
+        request = build_preset_generate_request(
+            "transaction_benchmark",
+            PresetGenerateRequest(seed=3, row_count=12, overrides={}),
+        )
+
+        first = generate_scenario(request)
+        second = generate_scenario(request)
+
+        self.assertEqual(first, second)
 
     def test_handler_routes_scenario_generate(self):
         event = {
