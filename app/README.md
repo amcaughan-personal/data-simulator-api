@@ -73,6 +73,8 @@ This package contains the Lambda application code for the data simulator API.
 }
 ```
 
+Providing a `seed` makes distribution outputs deterministic for the same request.
+
 ### Scenario Sample
 
 `/v1/scenarios/sample` returns one event and only accepts stateless injectors. Right now that means rate-based or count-based selection with any supported mutation.
@@ -168,6 +170,8 @@ This package contains the Lambda application code for the data simulator API.
 Injected rows keep mutation provenance in their labels. Each label includes the pre-mutation value, the post-mutation value, and the actual mutation parameters sampled for that row.
 
 Offset mutations accept either a fixed `amount` or a ranged `min_amount` / `max_amount`. Scale mutations accept either a fixed `factor` or a ranged `min_factor` / `max_factor`; for example, `factor: 1.2` means a 20% increase.
+
+Providing a `seed` makes scenario outputs deterministic for the same request. If `time.start` is omitted on a seeded scenario, the engine uses a fixed UTC baseline so event timestamps are deterministic too.
 
 ### List Presets
 
