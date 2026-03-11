@@ -75,7 +75,7 @@ This package contains the Lambda application code for the data simulator API.
 
 ### Scenario Sample
 
-`/v1/scenarios/sample` returns one event and only accepts stateless injectors. Right now that means rate-based selection with any supported mutation.
+`/v1/scenarios/sample` returns one event and only accepts stateless injectors. Right now that means rate-based or count-based selection with any supported mutation.
 
 ```json
 {
@@ -152,17 +152,22 @@ This package contains the Lambda application code for the data simulator API.
       "injector_id": "random_spikes",
       "field": "value",
       "selection": {
-        "kind": "rate",
-        "rate": 0.03
+        "kind": "count",
+        "count": 3
       },
       "mutation": {
-        "kind": "scale",
-        "factor": 10.0
+        "kind": "offset",
+        "min_amount": 5.0,
+        "max_amount": 12.0
       }
     }
   ]
 }
 ```
+
+Injected rows keep mutation provenance in their labels. Each label includes the pre-mutation value, the post-mutation value, and the actual mutation parameters sampled for that row.
+
+Offset mutations accept either a fixed `amount` or a ranged `min_amount` / `max_amount`. Scale mutations accept either a fixed `factor` or a ranged `min_factor` / `max_factor`; for example, `factor: 1.2` means a 20% increase.
 
 ### List Presets
 
