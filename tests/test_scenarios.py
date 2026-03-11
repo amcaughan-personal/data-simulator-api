@@ -54,8 +54,12 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["row_count"], 6)
         self.assertEqual(payload["label_summary"]["anomalous_rows"], 1)
         self.assertTrue(payload["rows"][2]["__is_anomaly"])
-        self.assertEqual(payload["rows"][2]["__labels"][0]["injector_id"], "spike_1")
-        self.assertEqual(payload["rows"][2]["__labels"][0]["selection_kind"], "index")
+        label = payload["rows"][2]["__labels"][0]
+        self.assertEqual(label["injector_id"], "spike_1")
+        self.assertEqual(label["selection_kind"], "index")
+        self.assertEqual(label["applied_mutation"]["factor"], 10.0)
+        self.assertAlmostEqual(label["mutated_value"], label["original_value"] * 10.0)
+        self.assertAlmostEqual(payload["rows"][2]["value"], label["mutated_value"])
 
     def test_generate_scenario_supports_rate_based_injectors(self):
         request = ScenarioGenerateRequest.model_validate(
@@ -99,6 +103,82 @@ class ScenarioEngineTest(unittest.TestCase):
             payload["label_summary"]["anomalous_rows"],
         )
 
+    def test_generate_scenario_supports_count_selection(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "count_generate",
+                "seed": 23,
+                "row_count": 10,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "three_scales",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 3,
+                        },
+                        "mutation": {
+                            "kind": "scale",
+                            "factor": 2.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertEqual(payload["label_summary"]["anomalous_rows"], 3)
+        self.assertEqual(payload["label_summary"]["anomaly_counts"]["scale"], 3)
+
+    def test_generate_scenario_rejects_count_selection_above_row_count(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "bad_count_generate",
+                "seed": 23,
+                "row_count": 2,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "too_many",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 3,
+                        },
+                        "mutation": {
+                            "kind": "scale",
+                            "factor": 2.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "count selection requires count <= row_count"):
+            generate_scenario(request)
+
     def test_sample_scenario_supports_stateless_injectors(self):
         request = ScenarioSampleRequest.model_validate(
             {
@@ -138,6 +218,80 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertTrue(payload["row"]["__is_anomaly"])
         self.assertEqual(payload["row"]["__labels"][0]["injector_id"], "always_scale")
 
+    def test_sample_scenario_supports_count_selection(self):
+        request = ScenarioSampleRequest.model_validate(
+            {
+                "name": "count_sample",
+                "seed": 5,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 7.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "single_pick",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 1,
+                        },
+                        "mutation": {
+                            "kind": "scale",
+                            "factor": 2.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        payload = sample_scenario(request)
+
+        self.assertTrue(payload["row"]["__is_anomaly"])
+        self.assertEqual(payload["row"]["__labels"][0]["selection_kind"], "count")
+
+    def test_sample_scenario_rejects_count_selection_above_row_count(self):
+        request = ScenarioSampleRequest.model_validate(
+            {
+                "name": "bad_count_sample",
+                "seed": 5,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 7.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "too_many",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 2,
+                        },
+                        "mutation": {
+                            "kind": "scale",
+                            "factor": 2.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "count selection requires count <= row_count"):
+            sample_scenario(request)
+
     def test_sample_scenario_rejects_stateful_selectors(self):
         request = ScenarioSampleRequest.model_validate(
             {
@@ -173,6 +327,52 @@ class ScenarioEngineTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "stateless injectors"):
             sample_scenario(request)
+
+    def test_generate_scenario_supports_ranged_mutations(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "range_generate",
+                "seed": 41,
+                "row_count": 4,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "ranged_offset",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 2,
+                        },
+                        "mutation": {
+                            "kind": "offset",
+                            "min_amount": 3.0,
+                            "max_amount": 5.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+        labeled_rows = [row for row in payload["rows"] if row["__is_anomaly"]]
+
+        self.assertEqual(len(labeled_rows), 2)
+        for row in labeled_rows:
+            label = row["__labels"][0]
+            applied_amount = label["applied_mutation"]["amount"]
+            self.assertGreaterEqual(applied_amount, 3.0)
+            self.assertLessEqual(applied_amount, 5.0)
+            self.assertAlmostEqual(label["mutated_value"] - label["original_value"], applied_amount)
 
     def test_preset_generate_builds_rows(self):
         request = build_preset_generate_request(
