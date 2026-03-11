@@ -8,13 +8,6 @@ import numpy as np
 from app.api.models import DistributionSampleRequest
 
 
-def _get_parameter(parameters: dict[str, Any], *names: str, default: Any = None) -> Any:
-    for name in names:
-        if name in parameters:
-            return parameters[name]
-    return default
-
-
 def _normalize_weights(values: Sequence[Any], weights: Sequence[float] | None) -> np.ndarray | None:
     if weights is None:
         return None
@@ -39,39 +32,39 @@ def sample_distribution(
     rng = np.random.default_rng(seed)
 
     if distribution == "normal":
-        mean = float(_get_parameter(parameters, "mean", "loc", default=0.0))
-        stddev = float(_get_parameter(parameters, "stddev", "sigma", "scale", default=1.0))
+        mean = float(parameters.get("mean", 0.0))
+        stddev = float(parameters.get("stddev", 1.0))
         return rng.normal(loc=mean, scale=stddev, size=count).tolist()
 
     if distribution == "uniform":
-        low = float(_get_parameter(parameters, "low", "min", default=0.0))
-        high = float(_get_parameter(parameters, "high", "max", default=1.0))
+        low = float(parameters.get("low", 0.0))
+        high = float(parameters.get("high", 1.0))
         return rng.uniform(low=low, high=high, size=count).tolist()
 
     if distribution == "lognormal":
-        mean = float(_get_parameter(parameters, "mean", default=0.0))
-        sigma = float(_get_parameter(parameters, "sigma", "stddev", default=1.0))
-        return rng.lognormal(mean=mean, sigma=sigma, size=count).tolist()
+        mean = float(parameters.get("mean", 0.0))
+        stddev = float(parameters.get("stddev", 1.0))
+        return rng.lognormal(mean=mean, sigma=stddev, size=count).tolist()
 
     if distribution == "exponential":
-        rate = _get_parameter(parameters, "rate")
-        scale = float(_get_parameter(parameters, "scale", default=1.0 if rate is None else 1.0 / float(rate)))
+        rate = float(parameters.get("rate", 1.0))
+        scale = 1.0 / rate
         return rng.exponential(scale=scale, size=count).tolist()
 
     if distribution == "poisson":
-        lam = float(_get_parameter(parameters, "lam", "lambda", "rate", default=1.0))
-        return rng.poisson(lam=lam, size=count).tolist()
+        rate = float(parameters.get("rate", 1.0))
+        return rng.poisson(lam=rate, size=count).tolist()
 
     if distribution == "bernoulli":
-        probability = float(_get_parameter(parameters, "p", "probability", default=0.5))
+        probability = float(parameters.get("probability", 0.5))
         return rng.binomial(n=1, p=probability, size=count).tolist()
 
     if distribution == "categorical":
-        values = _get_parameter(parameters, "values")
+        values = parameters.get("values")
         if not values:
             raise ValueError("categorical distributions require a non-empty values list")
 
-        weights = _normalize_weights(values, _get_parameter(parameters, "weights", default=None))
+        weights = _normalize_weights(values, parameters.get("weights"))
         return rng.choice(values, size=count, p=weights).tolist()
 
     raise ValueError(f"unsupported distribution: {distribution}")

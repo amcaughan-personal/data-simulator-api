@@ -46,7 +46,7 @@ def _build_transaction_preset(request: PresetPreviewRequest) -> ScenarioPreviewR
                         "distribution": "lognormal",
                         "parameters": {
                             "mean": float(overrides.get("amount_log_mean", 4.0)),
-                            "sigma": float(overrides.get("amount_sigma", 0.35)),
+                            "stddev": float(overrides.get("amount_stddev", 0.35)),
                         },
                     },
                 },
@@ -71,7 +71,7 @@ def _build_transaction_preset(request: PresetPreviewRequest) -> ScenarioPreviewR
                     "generator": {
                         "kind": "distribution",
                         "distribution": "bernoulli",
-                        "parameters": {"p": float(overrides.get("decline_probability", 0.04))},
+                        "parameters": {"probability": float(overrides.get("decline_probability", 0.04))},
                     },
                 },
             ],
