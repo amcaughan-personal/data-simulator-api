@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from app.api.models import DistributionSampleRequest
+from app.api.models import DistributionGenerateRequest, DistributionSampleRequest
 
 
 def _normalize_weights(values: Sequence[Any], weights: Sequence[float] | None) -> np.ndarray | None:
@@ -94,7 +94,7 @@ def summarize_samples(samples: Sequence[Any]) -> dict[str, Any]:
     return summary
 
 
-def build_distribution_response(request: DistributionSampleRequest) -> dict[str, Any]:
+def build_distribution_generate_response(request: DistributionGenerateRequest) -> dict[str, Any]:
     samples = sample_distribution(
         distribution=request.distribution,
         parameters=request.parameters,
@@ -113,3 +113,19 @@ def build_distribution_response(request: DistributionSampleRequest) -> dict[str,
         payload["summary"] = summarize_samples(samples)
 
     return payload
+
+
+def build_distribution_sample_response(request: DistributionSampleRequest) -> dict[str, Any]:
+    sample = sample_distribution(
+        distribution=request.distribution,
+        parameters=request.parameters,
+        count=1,
+        seed=request.seed,
+    )[0]
+
+    return {
+        "distribution": request.distribution,
+        "parameters": request.parameters,
+        "seed": request.seed,
+        "sample": sample,
+    }

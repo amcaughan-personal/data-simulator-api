@@ -1,15 +1,28 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
-from app.api.models import InjectorSpec
+from app.api.models import InjectorSpec, MutationSpec, SelectionSpec
 
 
 LABELS_KEY = "__labels"
 IS_ANOMALY_KEY = "__is_anomaly"
+
+
+@dataclass(frozen=True)
+class SelectionBehavior:
+    stateless: bool
+    select_indexes: Callable[[int, SelectionSpec, np.random.Generator], list[int]]
+
+
+@dataclass(frozen=True)
+class MutationBehavior:
+    stateless: bool
+    apply: Callable[[Sequence[dict[str, Any]], Sequence[int], str, MutationSpec], None]
 
 
 def initialize_labels(rows: Sequence[dict[str, Any]]) -> None:
@@ -40,9 +53,10 @@ def _tag_row(row: dict[str, Any], injector: InjectorSpec) -> None:
     row[IS_ANOMALY_KEY] = True
     row[LABELS_KEY].append(
         {
-            "anomaly_type": injector.kind,
+            "anomaly_type": injector.mutation.kind,
             "injector_id": injector.injector_id,
             "field": injector.field,
+            "selection_kind": injector.selection.kind,
             "severity": injector.severity,
         }
     )
@@ -57,113 +71,95 @@ def _end_index(end_index: int | None, row_count: int) -> int:
     return row_count if end_index is None else min(end_index, row_count)
 
 
-def _apply_point_spike(rows: Sequence[dict[str, Any]], injector) -> None:
-    indexes: list[int]
-    if injector.mode == "rate":
-        raise ValueError("point_spike rate mode requires an RNG")
-
-    if injector.index is None or injector.index >= len(rows):
-        return
-
-    indexes = [injector.index]
-    _apply_point_spike_indexes(rows, injector, indexes)
+def _select_index(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    if selection.index >= row_count:
+        return []
+    return [selection.index]
 
 
-def _apply_point_spike_indexes(rows: Sequence[dict[str, Any]], injector, indexes: Sequence[int]) -> None:
+def _select_window(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    start = min(selection.start_index, row_count)
+    end = _end_index(selection.end_index, row_count)
+    return list(range(start, end))
+
+
+def _select_rate(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    return [index for index in range(row_count) if rng.random() < selection.rate]
+
+
+def _select_count(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    actual_count = min(selection.count, row_count)
+    if actual_count <= 0:
+        return []
+    return sorted(rng.choice(row_count, size=actual_count, replace=False).tolist())
+
+
+def _apply_offset(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
     for index in indexes:
-        row = rows[index]
-        current_value = row[injector.field]
-
-        if injector.value is not None:
-            row[injector.field] = injector.value
-        elif injector.offset is not None:
-            row[injector.field] = current_value + injector.offset
-        elif injector.scale is not None:
-            row[injector.field] = current_value * injector.scale
-        else:
-            raise ValueError("point_spike requires one of value, offset, or scale")
-
-        _tag_row(row, injector)
+        rows[index][field] = rows[index][field] + mutation.amount
 
 
-def _apply_level_shift(rows: Sequence[dict[str, Any]], injector) -> None:
-    start = min(injector.start_index, len(rows))
-    end = _end_index(injector.end_index, len(rows))
-
-    for index in range(start, end):
-        rows[index][injector.field] = rows[index][injector.field] + injector.offset
-        _tag_row(rows[index], injector)
-
-
-def _apply_missing_burst(rows: Sequence[dict[str, Any]], injector) -> None:
-    if injector.start_index is None:
-        return
-
-    start = min(injector.start_index, len(rows))
-    end = _end_index(injector.end_index, len(rows))
-
-    for index in range(start, end):
-        rows[index][injector.field] = None
-        _tag_row(rows[index], injector)
-
-
-def _apply_missing_indexes(rows: Sequence[dict[str, Any]], injector, indexes: Sequence[int]) -> None:
+def _apply_scale(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
     for index in indexes:
-        rows[index][injector.field] = None
-        _tag_row(rows[index], injector)
+        rows[index][field] = rows[index][field] * mutation.factor
 
 
-def _apply_stuck_value(rows: Sequence[dict[str, Any]], injector) -> None:
-    start = min(injector.start_index, len(rows))
-    end = _end_index(injector.end_index, len(rows))
-
-    if start >= len(rows):
-        return
-
-    stuck_value = rows[start][injector.field] if injector.value is None else injector.value
-    for index in range(start, end):
-        rows[index][injector.field] = stuck_value
-        _tag_row(rows[index], injector)
+def _apply_set_value(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
+    for index in indexes:
+        rows[index][field] = mutation.value
 
 
-def _rate_indexes(row_count: int, rate: float, rng: np.random.Generator) -> list[int]:
-    return [index for index in range(row_count) if rng.random() < rate]
+def _apply_set_missing(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
+    for index in indexes:
+        rows[index][field] = None
+
+
+SELECTION_BEHAVIORS: dict[str, SelectionBehavior] = {
+    "count": SelectionBehavior(stateless=False, select_indexes=_select_count),
+    "index": SelectionBehavior(stateless=False, select_indexes=_select_index),
+    "rate": SelectionBehavior(stateless=True, select_indexes=_select_rate),
+    "window": SelectionBehavior(stateless=False, select_indexes=_select_window),
+}
+
+MUTATION_BEHAVIORS: dict[str, MutationBehavior] = {
+    "offset": MutationBehavior(stateless=True, apply=_apply_offset),
+    "scale": MutationBehavior(stateless=True, apply=_apply_scale),
+    "set_missing": MutationBehavior(stateless=True, apply=_apply_set_missing),
+    "set_value": MutationBehavior(stateless=True, apply=_apply_set_value),
+}
+
+
+def injector_is_stateless(injector: InjectorSpec) -> bool:
+    selection_behavior = SELECTION_BEHAVIORS[injector.selection.kind]
+    mutation_behavior = MUTATION_BEHAVIORS[injector.mutation.kind]
+    return selection_behavior.stateless and mutation_behavior.stateless
+
+
+def validate_stateless_injectors(injectors: Sequence[InjectorSpec]) -> None:
+    non_stateless = [
+        injector.injector_id
+        for injector in injectors
+        if not injector_is_stateless(injector)
+    ]
+
+    if non_stateless:
+        ids = ", ".join(non_stateless)
+        raise ValueError(f"scenario sample only supports stateless injectors; invalid injectors: {ids}")
 
 
 def apply_injectors(
     rows: Sequence[dict[str, Any]],
     injectors: Sequence[InjectorSpec],
-    rng: np.random.Generator | None = None,
+    rng: np.random.Generator,
 ) -> None:
     for injector in injectors:
         _validate_field(rows, injector.field)
 
-        if injector.kind == "point_spike":
-            if injector.mode == "rate":
-                if rng is None:
-                    raise ValueError("rate-based injectors require an RNG")
-                indexes = _rate_indexes(len(rows), injector.rate, rng)
-                _apply_point_spike_indexes(rows, injector, indexes)
-                continue
-            _apply_point_spike(rows, injector)
-            continue
+        selection_behavior = SELECTION_BEHAVIORS[injector.selection.kind]
+        mutation_behavior = MUTATION_BEHAVIORS[injector.mutation.kind]
 
-        if injector.kind == "level_shift":
-            _apply_level_shift(rows, injector)
-            continue
+        indexes = selection_behavior.select_indexes(len(rows), injector.selection, rng)
+        mutation_behavior.apply(rows, indexes, injector.field, injector.mutation)
 
-        if injector.kind == "missing_burst":
-            if injector.mode == "rate":
-                if rng is None:
-                    raise ValueError("rate-based injectors require an RNG")
-                indexes = _rate_indexes(len(rows), injector.rate, rng)
-                _apply_missing_indexes(rows, injector, indexes)
-                continue
-            _apply_missing_burst(rows, injector)
-            continue
-
-        if injector.kind == "stuck_value":
-            _apply_stuck_value(rows, injector)
-            continue
-
-        raise ValueError(f"unsupported injector kind: {injector.kind}")
+        for index in indexes:
+            _tag_row(rows[index], injector)

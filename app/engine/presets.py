@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
 
 from app.api.models import PresetGenerateRequest, ScenarioGenerateRequest
 
@@ -21,10 +21,12 @@ def list_presets() -> list[dict[str, str]]:
     ]
 
 
+PresetBuilder = Callable[[PresetGenerateRequest], ScenarioGenerateRequest]
+
+
 def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerateRequest:
     overrides = request.overrides
     row_count = request.row_count
-    anomaly_index = int(overrides.get("anomaly_index", max(1, row_count // 5)))
     regime_start = int(overrides.get("regime_start_index", max(1, row_count // 2)))
 
     return ScenarioGenerateRequest.model_validate(
@@ -77,18 +79,28 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
             ],
             "injectors": [
                 {
-                    "kind": "point_spike",
                     "injector_id": "amount_spike",
                     "field": "amount",
-                    "index": anomaly_index,
-                    "scale": float(overrides.get("anomaly_scale", 6.0)),
+                    "selection": {
+                        "kind": "rate",
+                        "rate": float(overrides.get("anomaly_rate", 0.03)),
+                    },
+                    "mutation": {
+                        "kind": "scale",
+                        "factor": float(overrides.get("anomaly_scale", 6.0)),
+                    },
                 },
                 {
-                    "kind": "level_shift",
                     "injector_id": "amount_regime_shift",
                     "field": "amount",
-                    "start_index": regime_start,
-                    "offset": float(overrides.get("regime_amount_offset", 35.0)),
+                    "selection": {
+                        "kind": "window",
+                        "start_index": regime_start,
+                    },
+                    "mutation": {
+                        "kind": "offset",
+                        "amount": float(overrides.get("regime_amount_offset", 35.0)),
+                    },
                 },
             ],
         }
@@ -100,6 +112,7 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
     row_count = request.row_count
     missing_start = int(overrides.get("missing_start_index", max(1, row_count // 3)))
     stuck_start = int(overrides.get("stuck_start_index", max(1, row_count // 2)))
+    stuck_value = float(overrides.get("stuck_value", overrides.get("temperature_mean", 22.0)))
 
     return ScenarioGenerateRequest.model_validate(
         {
@@ -145,18 +158,29 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
             ],
             "injectors": [
                 {
-                    "kind": "missing_burst",
                     "injector_id": "sensor_dropout",
                     "field": "pressure_kpa",
-                    "start_index": missing_start,
-                    "end_index": min(row_count, missing_start + int(overrides.get("missing_length", 5))),
+                    "selection": {
+                        "kind": "window",
+                        "start_index": missing_start,
+                        "end_index": min(row_count, missing_start + int(overrides.get("missing_length", 5))),
+                    },
+                    "mutation": {
+                        "kind": "set_missing",
+                    },
                 },
                 {
-                    "kind": "stuck_value",
                     "injector_id": "sensor_stuck",
                     "field": "temperature_c",
-                    "start_index": stuck_start,
-                    "end_index": min(row_count, stuck_start + int(overrides.get("stuck_length", 6))),
+                    "selection": {
+                        "kind": "window",
+                        "start_index": stuck_start,
+                        "end_index": min(row_count, stuck_start + int(overrides.get("stuck_length", 6))),
+                    },
+                    "mutation": {
+                        "kind": "set_value",
+                        "value": stuck_value,
+                    },
                 },
             ],
         }
@@ -164,7 +188,7 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
 
 
 def build_preset_generate_request(preset_id: str, request: PresetGenerateRequest) -> ScenarioGenerateRequest:
-    builders: dict[str, Any] = {
+    builders: dict[str, PresetBuilder] = {
         "iot_sensor_benchmark": _build_iot_sensor_preset,
         "transaction_benchmark": _build_transaction_preset,
     }

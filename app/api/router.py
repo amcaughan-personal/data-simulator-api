@@ -7,10 +7,16 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.api.models import DistributionSampleRequest, PresetGenerateRequest, ScenarioGenerateRequest
-from app.engine.distributions import build_distribution_response
+from app.api.models import (
+    DistributionGenerateRequest,
+    DistributionSampleRequest,
+    PresetGenerateRequest,
+    ScenarioGenerateRequest,
+    ScenarioSampleRequest,
+)
+from app.engine.distributions import build_distribution_generate_response, build_distribution_sample_response
 from app.engine.presets import build_preset_generate_request, list_presets
-from app.engine.scenario import generate_scenario
+from app.engine.scenario import generate_scenario, sample_scenario
 
 
 def json_response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -36,15 +42,13 @@ def _extract_payload(event: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in event.items() if key not in ignored_keys}
 
 
-def _extract_preset_id(route: str, event: dict[str, Any], payload: dict[str, Any]) -> str | None:
+def _extract_preset_id(route: str, event: dict[str, Any]) -> str | None:
     path_parameters = event.get("pathParameters") or {}
     if "preset_id" in path_parameters:
         return path_parameters["preset_id"]
-    if "preset_id" in payload:
-        return payload["preset_id"]
 
     parts = [part for part in route.split("/") if part]
-    if len(parts) >= 4 and parts[0] == "v1" and parts[1] == "presets" and parts[3] == "generate":
+    if len(parts) == 4 and parts[0] == "v1" and parts[1] == "presets" and parts[3] == "generate":
         return parts[2]
 
     return None
@@ -68,7 +72,15 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
 
         if route == "/v1/distributions/sample":
             request = DistributionSampleRequest.model_validate(payload)
-            return json_response(200, build_distribution_response(request))
+            return json_response(200, build_distribution_sample_response(request))
+
+        if route == "/v1/distributions/generate":
+            request = DistributionGenerateRequest.model_validate(payload)
+            return json_response(200, build_distribution_generate_response(request))
+
+        if route == "/v1/scenarios/sample":
+            request = ScenarioSampleRequest.model_validate(payload)
+            return json_response(200, sample_scenario(request))
 
         if route == "/v1/scenarios/generate":
             request = ScenarioGenerateRequest.model_validate(payload)
@@ -77,15 +89,14 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
         if route == "/v1/presets":
             return json_response(200, {"presets": list_presets()})
 
-        if route == "/v1/presets/generate" or route.endswith("/generate"):
-            preset_id = _extract_preset_id(route, event, payload)
-            if not preset_id:
-                raise ValueError("preset generate requires a preset_id")
-
-            request_payload = {key: value for key, value in payload.items() if key != "preset_id"}
-            request = PresetGenerateRequest.model_validate(request_payload)
+        preset_id = _extract_preset_id(route, event)
+        if preset_id:
+            request = PresetGenerateRequest.model_validate(payload)
             scenario_request = build_preset_generate_request(preset_id, request)
             return json_response(200, generate_scenario(scenario_request))
+
+        if route.startswith("/v1/presets/") and route.endswith("/generate"):
+            raise ValueError("preset generate requires a preset_id")
 
     except ValidationError as exc:
         return json_response(400, {"error": "validation_error", "details": json.loads(exc.json())})
