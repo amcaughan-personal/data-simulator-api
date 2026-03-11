@@ -64,7 +64,7 @@ This package contains the Lambda application code for the data simulator API.
   "action": "/v1/scenarios/generate",
   "name": "simple_generate",
   "seed": 11,
-  "row_count": 6,
+  "row_count": 100,
   "time": {
     "frequency_seconds": 60
   },
@@ -92,9 +92,10 @@ This package contains the Lambda application code for the data simulator API.
   "injectors": [
     {
       "kind": "point_spike",
-      "injector_id": "spike_1",
+      "injector_id": "random_spikes",
       "field": "value",
-      "index": 2,
+      "mode": "rate",
+      "rate": 0.03,
       "scale": 10.0
     }
   ]

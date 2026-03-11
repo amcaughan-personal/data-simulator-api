@@ -88,11 +88,29 @@ class PointSpikeInjectorSpec(BaseModel):
     kind: Literal["point_spike"]
     injector_id: str
     field: str
-    index: int = Field(ge=0)
+    mode: Literal["index", "rate"] = "index"
+    index: int | None = Field(default=None, ge=0)
+    rate: float | None = Field(default=None, gt=0.0, le=1.0)
     value: float | int | None = None
     offset: float | None = None
     scale: float | None = None
     severity: float = Field(default=1.0, ge=0.0)
+
+    @field_validator("index")
+    @classmethod
+    def validate_index_mode(cls, index: int | None, info) -> int | None:
+        mode = info.data.get("mode", "index")
+        if mode == "index" and index is None:
+            raise ValueError("index is required when mode is 'index'")
+        return index
+
+    @field_validator("rate")
+    @classmethod
+    def validate_rate_mode(cls, rate: float | None, info) -> float | None:
+        mode = info.data.get("mode", "index")
+        if mode == "rate" and rate is None:
+            raise ValueError("rate is required when mode is 'rate'")
+        return rate
 
 
 class LevelShiftInjectorSpec(BaseModel):
@@ -113,9 +131,27 @@ class MissingBurstInjectorSpec(BaseModel):
     kind: Literal["missing_burst"]
     injector_id: str
     field: str
-    start_index: int = Field(ge=0)
+    mode: Literal["window", "rate"] = "window"
+    start_index: int | None = Field(default=None, ge=0)
     end_index: int | None = Field(default=None, ge=0)
+    rate: float | None = Field(default=None, gt=0.0, le=1.0)
     severity: float = Field(default=1.0, ge=0.0)
+
+    @field_validator("start_index")
+    @classmethod
+    def validate_window_mode(cls, start_index: int | None, info) -> int | None:
+        mode = info.data.get("mode", "window")
+        if mode == "window" and start_index is None:
+            raise ValueError("start_index is required when mode is 'window'")
+        return start_index
+
+    @field_validator("rate")
+    @classmethod
+    def validate_missing_rate_mode(cls, rate: float | None, info) -> float | None:
+        mode = info.data.get("mode", "window")
+        if mode == "rate" and rate is None:
+            raise ValueError("rate is required when mode is 'rate'")
+        return rate
 
 
 class StuckValueInjectorSpec(BaseModel):

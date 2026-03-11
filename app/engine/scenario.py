@@ -55,7 +55,7 @@ def _build_rows(request: ScenarioGenerateRequest) -> list[dict[str, Any]]:
             rows[index][field.name] = value
 
     initialize_labels(rows)
-    apply_injectors(rows, request.injectors)
+    apply_injectors(rows, request.injectors, rng)
     return rows
 
 

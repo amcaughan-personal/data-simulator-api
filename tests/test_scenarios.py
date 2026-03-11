@@ -51,6 +51,44 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertTrue(payload["rows"][2]["__is_anomaly"])
         self.assertEqual(payload["rows"][2]["__labels"][0]["injector_id"], "spike_1")
 
+    def test_generate_scenario_supports_rate_based_injectors(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "rate_generate",
+                "seed": 17,
+                "row_count": 50,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 1.5},
+                        },
+                    }
+                ],
+                "injectors": [
+                    {
+                        "kind": "point_spike",
+                        "injector_id": "random_spikes",
+                        "field": "value",
+                        "mode": "rate",
+                        "rate": 0.1,
+                        "scale": 5.0,
+                    }
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertGreater(payload["label_summary"]["anomalous_rows"], 0)
+        self.assertEqual(
+            payload["label_summary"]["anomaly_counts"]["point_spike"],
+            payload["label_summary"]["anomalous_rows"],
+        )
+
     def test_preset_generate_builds_rows(self):
         request = build_preset_generate_request(
             "transaction_benchmark",
