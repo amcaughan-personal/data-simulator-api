@@ -196,6 +196,20 @@ aws lambda invoke \
   /tmp/data-simulator-sample.json
 ```
 
+## Manual Smoke Test
+
+Run a few end-to-end checks against the deployed Lambda:
+
+```bash
+./scripts/smoke_test_lambda.sh
+```
+
+Pass a different function name if needed:
+
+```bash
+./scripts/smoke_test_lambda.sh data-simulator-api-prod
+```
+
 ## Design Notes
 
 - `handler.py` should stay thin.
