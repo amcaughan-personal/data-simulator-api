@@ -65,7 +65,7 @@ class ScenarioEngineTest(unittest.TestCase):
 
     def test_handler_routes_scenario_preview(self):
         event = {
-            "action": "scenario_preview",
+            "action": "/v1/scenarios/preview",
             "name": "handler_preview",
             "seed": 9,
             "row_count": 3,
@@ -91,7 +91,7 @@ class ScenarioEngineTest(unittest.TestCase):
 
     def test_handler_routes_preset_preview(self):
         event = {
-            "action": "preset_preview",
+            "action": "/v1/presets/preview",
             "preset_id": "iot_sensor_benchmark",
             "seed": 5,
             "row_count": 8,

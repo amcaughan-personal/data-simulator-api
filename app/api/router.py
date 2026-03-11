@@ -22,7 +22,7 @@ def json_response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _resolve_route(event: dict[str, Any]) -> str:
-    return event.get("rawPath") or event.get("path") or event.get("action") or "health"
+    return event.get("rawPath") or event.get("path") or event.get("action") or "/health"
 
 
 def _extract_payload(event: dict[str, Any]) -> dict[str, Any]:
@@ -50,25 +50,12 @@ def _extract_preset_id(route: str, event: dict[str, Any], payload: dict[str, Any
     return None
 
 
-def _distribution_payload_from_legacy_simulate(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "distribution": payload.get("distribution", "normal"),
-        "parameters": {
-            "mean": payload.get("mean", 0.0),
-            "stddev": payload.get("stddev", 1.0),
-        },
-        "count": payload.get("count", 1),
-        "seed": payload.get("seed"),
-        "summary": payload.get("summary", False),
-    }
-
-
 def handle_request(event: dict[str, Any]) -> dict[str, Any]:
     route = _resolve_route(event)
     payload = _extract_payload(event)
 
     try:
-        if route in ("/health", "health"):
+        if route == "/health":
             return json_response(
                 200,
                 {
@@ -79,20 +66,18 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
                 },
             )
 
-        if route in ("/simulate", "simulate", "/v1/distributions/sample", "sample_distribution"):
-            request = DistributionSampleRequest.model_validate(
-                payload if "distribution" in payload else _distribution_payload_from_legacy_simulate(payload)
-            )
+        if route == "/v1/distributions/sample":
+            request = DistributionSampleRequest.model_validate(payload)
             return json_response(200, build_distribution_response(request))
 
-        if route in ("/v1/scenarios/preview", "scenario_preview"):
+        if route == "/v1/scenarios/preview":
             request = ScenarioPreviewRequest.model_validate(payload)
             return json_response(200, preview_scenario(request))
 
-        if route in ("/v1/presets", "presets", "list_presets"):
+        if route == "/v1/presets":
             return json_response(200, {"presets": list_presets()})
 
-        if route in ("/v1/presets/preview", "preset_preview") or route.endswith("/preview"):
+        if route == "/v1/presets/preview" or route.endswith("/preview"):
             preset_id = _extract_preset_id(route, event, payload)
             if not preset_id:
                 raise ValueError("preset preview requires a preset_id")

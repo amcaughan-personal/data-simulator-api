@@ -25,7 +25,7 @@ This package contains the Lambda application code for the data simulator API.
 
 ## Current API Surface
 
-- `health`
+- `/health`
 - `/v1/distributions/sample`
 - `/v1/scenarios/preview`
 - `/v1/presets`
