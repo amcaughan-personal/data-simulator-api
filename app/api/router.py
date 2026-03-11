@@ -97,7 +97,8 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
             if not preset_id:
                 raise ValueError("preset preview requires a preset_id")
 
-            request = PresetPreviewRequest.model_validate(payload)
+            request_payload = {key: value for key, value in payload.items() if key != "preset_id"}
+            request = PresetPreviewRequest.model_validate(request_payload)
             scenario_request = build_preset_preview(preset_id, request)
             return json_response(200, preview_scenario(scenario_request))
 

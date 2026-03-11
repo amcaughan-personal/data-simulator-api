@@ -89,6 +89,21 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["scenario_name"], "handler_preview")
         self.assertEqual(len(payload["rows"]), 3)
 
+    def test_handler_routes_preset_preview(self):
+        event = {
+            "action": "preset_preview",
+            "preset_id": "iot_sensor_benchmark",
+            "seed": 5,
+            "row_count": 8,
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(payload["scenario_name"], "iot_sensor_benchmark")
+        self.assertEqual(len(payload["rows"]), 8)
+
 
 if __name__ == "__main__":
     unittest.main()
