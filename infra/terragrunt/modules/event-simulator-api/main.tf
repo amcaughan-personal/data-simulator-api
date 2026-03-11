@@ -29,13 +29,15 @@ resource "null_resource" "package" {
     app_hash = sha256(join("", [
       for file_name in local.app_files : filesha256("${var.app_dir}/${file_name}")
     ]))
+    architecture     = var.architecture
+    package_script   = filesha256("${path.module}/package_lambda.sh")
     runtime          = var.runtime
     requirements_txt = fileexists("${var.app_dir}/requirements.txt") ? file("${var.app_dir}/requirements.txt") : ""
   }
 
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
-    command     = "\"${path.module}/package_lambda.sh\" \"${var.app_dir}\" \"${local.build_dir}\""
+    command     = "\"${path.module}/package_lambda.sh\" \"${var.app_dir}\" \"${local.build_dir}\" \"${var.runtime}\" \"${var.architecture}\""
   }
 }
 
@@ -83,6 +85,7 @@ resource "aws_lambda_function" "this" {
   handler       = var.handler
   timeout       = var.timeout_seconds
   memory_size   = var.memory_size_mb
+  architectures = [var.architecture]
 
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256

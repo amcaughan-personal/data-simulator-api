@@ -2,6 +2,11 @@ variable "app_dir" {
   type = string
 }
 
+variable "architecture" {
+  type    = string
+  default = "x86_64"
+}
+
 variable "description" {
   type    = string
   default = "Data simulator API Lambda"
