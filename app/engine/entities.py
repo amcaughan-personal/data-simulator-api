@@ -100,3 +100,14 @@ def generate_entity_values(
         return [values[index] for index in entity_indexes]
 
     raise ValueError(f"unsupported entity generator kind: {generator.kind}")
+
+
+def resolve_entity_attribute_value(
+    entity_context: EntityContext,
+    entity_name: str,
+    attribute: str,
+    row_index: int,
+) -> Any:
+    pool = entity_context.pools[entity_name]
+    entity_index = pool.row_entity_indexes[row_index]
+    return pool.attribute_values[attribute][entity_index]

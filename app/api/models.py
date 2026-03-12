@@ -51,6 +51,52 @@ class DistributionGeneratorSpec(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class FieldMatchSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    field: str
+    equals: Any
+
+
+class ContextualParameterModifierSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parameter: str
+    operation: Literal["add", "multiply", "set"]
+    value: float | None = None
+    source_field: str | None = None
+    entity_name: str | None = None
+    entity_attribute: str | None = None
+    when: list[FieldMatchSpec] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_source_config(self) -> ContextualParameterModifierSpec:
+        sources = [
+            self.value is not None,
+            self.source_field is not None,
+            self.entity_name is not None or self.entity_attribute is not None,
+        ]
+        if sum(sources) != 1:
+            raise ValueError(
+                "contextual parameter modifiers must use exactly one of value, "
+                "source_field, or entity_name/entity_attribute"
+            )
+
+        if (self.entity_name is None) != (self.entity_attribute is None):
+            raise ValueError("entity_name and entity_attribute must be provided together")
+
+        return self
+
+
+class ContextualDistributionGeneratorSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["contextual_distribution"]
+    distribution: DistributionName
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    parameter_modifiers: list[ContextualParameterModifierSpec] = Field(default_factory=list)
+
+
 class ConstantGeneratorSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,6 +135,7 @@ class EntityAttributeGeneratorSpec(BaseModel):
 
 GeneratorSpec = Annotated[
     DistributionGeneratorSpec
+    | ContextualDistributionGeneratorSpec
     | ConstantGeneratorSpec
     | CategoricalGeneratorSpec
     | EntityIdGeneratorSpec
@@ -232,6 +279,7 @@ class InjectorSpec(BaseModel):
 
     injector_id: str
     field: str
+    scope: list[FieldMatchSpec] = Field(default_factory=list)
     selection: SelectionSpec
     mutation: MutationSpec
     severity: float = Field(default=1.0, ge=0.0)
@@ -276,6 +324,44 @@ class ScenarioRequestBase(BaseModel):
                     raise ValueError(
                         f"field {field.name} references unknown entity attribute: "
                         f"{generator.entity_name}.{generator.attribute}"
+                    )
+
+        available_fields: set[str] = set()
+        for field in self.fields:
+            generator = field.generator
+
+            if generator.kind == "contextual_distribution":
+                for modifier in generator.parameter_modifiers:
+                    if modifier.source_field is not None and modifier.source_field not in available_fields:
+                        raise ValueError(
+                            f"field {field.name} references unavailable source field: {modifier.source_field}"
+                        )
+
+                    if modifier.entity_name is not None:
+                        if modifier.entity_name not in pool_attributes:
+                            raise ValueError(
+                                f"field {field.name} references unknown entity pool: {modifier.entity_name}"
+                            )
+                        if modifier.entity_attribute not in pool_attributes[modifier.entity_name]:
+                            raise ValueError(
+                                f"field {field.name} references unknown entity attribute: "
+                                f"{modifier.entity_name}.{modifier.entity_attribute}"
+                            )
+
+                    for condition in modifier.when:
+                        if condition.field not in available_fields:
+                            raise ValueError(
+                                f"field {field.name} references unavailable condition field: {condition.field}"
+                            )
+
+            available_fields.add(field.name)
+
+        all_field_names = {field.name for field in self.fields}
+        for injector in self.injectors:
+            for match in injector.scope:
+                if match.field not in all_field_names:
+                    raise ValueError(
+                        f"injector {injector.injector_id} references unknown scope field: {match.field}"
                     )
 
         return self

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 from app.api.models import FieldSpec, ScenarioGenerateRequest, ScenarioRequestBase, ScenarioSampleRequest
 from app.engine.entities import EntityContext, build_entity_context, generate_entity_values
-from app.engine.generators import generate_primitive_values
+from app.engine.generators import generate_contextual_distribution_values, generate_primitive_values
 from app.engine.injectors import (
     apply_injectors,
     initialize_labels,
@@ -19,14 +18,18 @@ DEFAULT_SCENARIO_START = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
 def _generate_field_values(
     field: FieldSpec,
-    row_count: int,
+    rows: list[dict[str, object]],
     scenario_seed: int | None,
     entity_context: EntityContext,
-) -> list[Any]:
+) -> list[object]:
     generator = field.generator
+    row_count = len(rows)
 
     if generator.kind in {"constant", "categorical", "distribution"}:
         return generate_primitive_values(generator, row_count, scenario_seed, "field", field.name)
+
+    if generator.kind == "contextual_distribution":
+        return generate_contextual_distribution_values(generator, field.name, rows, scenario_seed, entity_context)
 
     if generator.kind in {"entity_attribute", "entity_id"}:
         return generate_entity_values(generator, row_count, entity_context)
@@ -57,7 +60,7 @@ def _build_rows(request: ScenarioRequestBase, row_count: int, stateless_only: bo
     ]
 
     for field in request.fields:
-        values = _generate_field_values(field, row_count, request.seed, entity_context)
+        values = _generate_field_values(field, rows, request.seed, entity_context)
         for index, value in enumerate(values):
             rows[index][field.name] = value
 

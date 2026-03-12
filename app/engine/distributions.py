@@ -8,6 +8,28 @@ import numpy as np
 from app.api.models import DistributionGenerateRequest, DistributionSampleRequest
 
 
+DEFAULT_DISTRIBUTION_PARAMETERS: dict[str, dict[str, float]] = {
+    "bernoulli": {"probability": 0.5},
+    "categorical": {},
+    "exponential": {"rate": 1.0},
+    "lognormal": {"mean": 0.0, "stddev": 1.0},
+    "normal": {"mean": 0.0, "stddev": 1.0},
+    "poisson": {"rate": 1.0},
+    "uniform": {"low": 0.0, "high": 1.0},
+}
+
+
+def resolve_distribution_parameter(distribution: str, parameters: dict[str, Any], parameter: str) -> float:
+    if parameter in parameters:
+        return float(parameters[parameter])
+
+    defaults = DEFAULT_DISTRIBUTION_PARAMETERS.get(distribution, {})
+    if parameter in defaults:
+        return defaults[parameter]
+
+    raise ValueError(f"unsupported parameter {parameter} for distribution {distribution}")
+
+
 def _normalize_weights(values: Sequence[Any], weights: Sequence[float] | None) -> np.ndarray | None:
     if weights is None:
         return None

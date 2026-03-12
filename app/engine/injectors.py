@@ -6,7 +6,14 @@ from typing import Any
 
 import numpy as np
 
-from app.api.models import InjectorSpec, MutationSpec, OffsetMutationSpec, ScaleMutationSpec, SelectionSpec
+from app.api.models import (
+    FieldMatchSpec,
+    InjectorSpec,
+    MutationSpec,
+    OffsetMutationSpec,
+    ScaleMutationSpec,
+    SelectionSpec,
+)
 from app.engine.randomness import build_rng
 
 
@@ -17,7 +24,7 @@ IS_ANOMALY_KEY = "__is_anomaly"
 @dataclass(frozen=True)
 class SelectionBehavior:
     stateless: bool
-    select_indexes: Callable[[int, SelectionSpec, np.random.Generator], list[int]]
+    select_indexes: Callable[[Sequence[int], SelectionSpec, np.random.Generator], list[int]]
 
 
 @dataclass(frozen=True)
@@ -75,26 +82,32 @@ def _end_index(end_index: int | None, row_count: int) -> int:
     return row_count if end_index is None else min(end_index, row_count)
 
 
-def _select_index(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
-    if selection.index >= row_count:
+def _select_index(candidate_indexes: Sequence[int], selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    if selection.index not in candidate_indexes:
         return []
     return [selection.index]
 
 
-def _select_window(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
-    start = min(selection.start_index, row_count)
-    end = _end_index(selection.end_index, row_count)
-    return list(range(start, end))
+def _select_window(candidate_indexes: Sequence[int], selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    end = _end_index(selection.end_index, max(candidate_indexes, default=0) + 1)
+    return [index for index in candidate_indexes if selection.start_index <= index < end]
 
 
-def _select_rate(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
-    return [index for index in range(row_count) if rng.random() < selection.rate]
+def _select_rate(candidate_indexes: Sequence[int], selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    return [index for index in candidate_indexes if rng.random() < selection.rate]
 
 
-def _select_count(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
-    if selection.count > row_count:
-        raise ValueError(f"count selection requires count <= row_count; got count={selection.count}, row_count={row_count}")
-    return sorted(rng.choice(row_count, size=selection.count, replace=False).tolist())
+def _select_count(candidate_indexes: Sequence[int], selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
+    if selection.count > len(candidate_indexes):
+        raise ValueError(
+            "count selection requires count <= eligible_row_count; "
+            f"got count={selection.count}, eligible_row_count={len(candidate_indexes)}"
+        )
+    return sorted(rng.choice(list(candidate_indexes), size=selection.count, replace=False).tolist())
+
+
+def _matches_scope(row: dict[str, Any], scope: Sequence[FieldMatchSpec]) -> bool:
+    return all(row.get(match.field) == match.equals for match in scope)
 
 
 def _resolve_offset_amount(mutation: OffsetMutationSpec, rng: np.random.Generator) -> float:
@@ -211,7 +224,8 @@ def apply_injectors(
         mutation_behavior = MUTATION_BEHAVIORS[injector.mutation.kind]
 
         selection_rng = build_rng(scenario_seed, "injector", injector.injector_id, "selection")
-        indexes = selection_behavior.select_indexes(len(rows), injector.selection, selection_rng)
+        candidate_indexes = [index for index, row in enumerate(rows) if _matches_scope(row, injector.scope)]
+        indexes = selection_behavior.select_indexes(candidate_indexes, injector.selection, selection_rng)
         for index in indexes:
             mutation_rng = build_rng(scenario_seed, "injector", injector.injector_id, "mutation", index)
             mutation_result = mutation_behavior.apply(rows[index], injector.field, injector.mutation, mutation_rng)
