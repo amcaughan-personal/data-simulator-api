@@ -14,10 +14,12 @@ This package contains the Lambda application code for the data simulator API.
   primitive distribution sampling and summaries
 - `engine/entities.py`
   entity pools and stable per-row entity assignment
+- `engine/process_modifiers.py`
+  generation-time cross-row parameter adjustments
+- `engine/mutations.py`
+  post-generation row mutations
 - `engine/scenario.py`
   scenario generation
-- `engine/injectors.py`
-  anomaly and benchmark injection logic
 - `engine/presets.py`
   built-in preset scenarios
 - `requirements.in`
@@ -79,7 +81,7 @@ Providing a `seed` makes distribution outputs deterministic for the same request
 
 ### Scenario Sample
 
-`/v1/scenarios/sample` returns one event and only accepts stateless injectors. Right now that means rate-based or count-based selection with any supported mutation.
+`/v1/scenarios/sample` returns one row and only accepts sample-compatible process modifiers and mutations. Right now that means rate-based or count-based selection.
 
 ```json
 {
@@ -99,9 +101,9 @@ Providing a `seed` makes distribution outputs deterministic for the same request
       }
     }
   ],
-  "injectors": [
+  "mutations": [
     {
-      "injector_id": "always_scale",
+      "mutation_id": "always_scale",
       "field": "value",
       "selection": {
         "kind": "rate",
@@ -145,9 +147,9 @@ Providing a `seed` makes distribution outputs deterministic for the same request
       }
     }
   ],
-  "injectors": [
+  "mutations": [
     {
-      "injector_id": "random_spikes",
+      "mutation_id": "random_spikes",
       "field": "value",
       "selection": {
         "kind": "count",
@@ -163,7 +165,7 @@ Providing a `seed` makes distribution outputs deterministic for the same request
 }
 ```
 
-Injected rows keep mutation provenance in their labels. Each label includes the pre-mutation value, the post-mutation value, and the actual mutation parameters sampled for that row.
+Generated rows keep label provenance for both generation-time process modifiers and post-generation mutations. Mutation labels include the pre-mutation value, the post-mutation value, and the actual mutation parameters sampled for that row. Process modifier labels include the applied parameter adjustments and the final generated value.
 
 Offset mutations accept either a fixed `amount` or a ranged `min_amount` / `max_amount`. Scale mutations accept either a fixed `factor` or a ranged `min_factor` / `max_factor`; for example, `factor: 1.2` means a 20% increase.
 
@@ -292,10 +294,11 @@ one or more distribution parameters per row. Modifiers can use:
 
 Modifiers are applied in order, so the request stays readable.
 
-### Scoped Injectors
+### Process Modifiers And Scoped Mutations
 
-Injectors can also be scoped to a subset of rows. That is useful when one segment or
-entity should behave differently even though the overall scenario stays the same.
+Process modifiers are applied during generation and are best for things like regime
+shifts or drift windows. Mutations are applied after generation and are best for
+dropouts, spikes, or forced value changes.
 
 ```json
 {
@@ -324,9 +327,9 @@ entity should behave differently even though the overall scenario stays the same
       }
     }
   ],
-  "injectors": [
+  "mutations": [
     {
-      "injector_id": "target_only",
+      "mutation_id": "target_only",
       "field": "value",
       "scope": [
         {
@@ -469,9 +472,9 @@ then shifts into an online, high-risk period with larger amounts and more declin
       }
     }
   ],
-  "injectors": [
+  "process_modifiers": [
     {
-      "injector_id": "takeover_window",
+      "modifier_id": "takeover_window",
       "field": "amount",
       "scope": [
         {
@@ -484,11 +487,13 @@ then shifts into an online, high-risk period with larger amounts and more declin
         "start_index": 80,
         "end_index": 110
       },
-      "mutation": {
-        "kind": "scale",
-        "min_factor": 2.0,
-        "max_factor": 4.0
-      }
+      "parameter_modifiers": [
+        {
+          "parameter": "mean",
+          "operation": "add",
+          "value": 0.6
+        }
+      ]
     }
   ]
 }
@@ -583,9 +588,9 @@ noise profile, and a subset of pressure sensors experience a dropout window.
       }
     }
   ],
-  "injectors": [
+  "mutations": [
     {
-      "injector_id": "pressure_dropout",
+      "mutation_id": "pressure_dropout",
       "field": "temperature_c",
       "scope": [
         {
@@ -791,11 +796,11 @@ region, price band, or return rate.
 
 Current presets:
 - `transaction_benchmark`
-  card and merchant IDs with stable merchant and card dimensions
+  card and merchant IDs with stable merchant and card dimensions, plus a generation-time amount regime shift
 - `iot_sensor_benchmark`
-  device and site IDs with telemetry anomalies
+  device and site IDs with telemetry mutations and a generation-time pressure regime shift
 - `order_benchmark`
-  customer and product IDs with order amount and fulfillment anomalies
+  customer and product IDs with generation-time marketplace shifts and fulfillment mutations
 
 ### Lambda Invoke Example
 
