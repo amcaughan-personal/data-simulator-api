@@ -794,7 +794,36 @@ region, price band, or return rate.
 }
 ```
 
+### Batch Delivery Preset
+
+`batch_delivery_benchmark` is meant for ELT-style file drops. One API call can be
+treated as one delivered file from one client. To simulate multiple clients or
+multiple deliveries, call the same preset again with a different `source_system_id`,
+`delivery_id`, `delivery_date`, and optionally a different seed.
+
+```json
+{
+  "action": "/v1/presets/batch_delivery_benchmark/generate",
+  "seed": 19,
+  "row_count": 8,
+  "overrides": {
+    "source_system_id": "hospital_system_a",
+    "delivery_id": "hospital_system_a_20260312",
+    "delivery_date": "2026-03-12",
+    "feed_type": "member_snapshot",
+    "facility_count": 3
+  }
+}
+```
+
+The returned rows are shaped more like a delivered batch than a time series. They
+include repeated batch metadata such as `source_system_id`, `delivery_id`, and
+`delivery_date`, plus row-level fields such as `record_number`, `member_id`,
+`facility_id`, `plan_tier`, and `allowed_amount`.
+
 Current presets:
+- `batch_delivery_benchmark`
+  one batch-delivered client file per API call, with source-system, delivery, facility, and member-style fields
 - `transaction_benchmark`
   card and merchant IDs with stable merchant and card dimensions, plus a generation-time amount regime shift
 - `iot_sensor_benchmark`
