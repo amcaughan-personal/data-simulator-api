@@ -54,3 +54,38 @@ variable "timeout_seconds" {
   type    = number
   default = 5
 }
+
+variable "private_api_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "private_api_allowed_vpc_ssm_param_name" {
+  type    = string
+  default = null
+
+  validation {
+    condition     = !var.private_api_enabled || var.private_api_allowed_vpc_ssm_param_name != null
+    error_message = "private_api_allowed_vpc_ssm_param_name must be set when private_api_enabled is true."
+  }
+}
+
+variable "private_api_execute_api_vpce_ssm_param_name" {
+  type    = string
+  default = null
+
+  validation {
+    condition     = !var.private_api_enabled || var.private_api_execute_api_vpce_ssm_param_name != null
+    error_message = "private_api_execute_api_vpce_ssm_param_name must be set when private_api_enabled is true."
+  }
+}
+
+variable "private_api_log_retention_in_days" {
+  type    = number
+  default = 14
+}
+
+variable "private_api_stage_name" {
+  type    = string
+  default = null
+}

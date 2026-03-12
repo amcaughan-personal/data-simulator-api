@@ -17,3 +17,15 @@ output "dlq_arn" {
 output "dlq_url" {
   value = aws_sqs_queue.dlq.url
 }
+
+output "private_api_id" {
+  value = var.private_api_enabled ? aws_api_gateway_rest_api.private[0].id : null
+}
+
+output "private_api_stage_name" {
+  value = var.private_api_enabled ? aws_api_gateway_stage.private[0].stage_name : null
+}
+
+output "private_api_invoke_url" {
+  value = var.private_api_enabled ? "https://${aws_api_gateway_rest_api.private[0].id}.execute-api.${data.aws_region.current.region}.amazonaws.com/${aws_api_gateway_stage.private[0].stage_name}" : null
+}
