@@ -34,6 +34,7 @@ class DistributionGenerateRequest(DistributionRequestBase):
     count: int = Field(default=100, ge=1, le=5000)
     summary: bool = False
 
+
 class DistributionGeneratorSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,7 +58,7 @@ class FieldMatchSpec(BaseModel):
     equals: Any
 
 
-class ContextualParameterModifierSpec(BaseModel):
+class ParameterModifierSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     parameter: str
@@ -69,7 +70,7 @@ class ContextualParameterModifierSpec(BaseModel):
     when: list[FieldMatchSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_source_config(self) -> ContextualParameterModifierSpec:
+    def validate_source_config(self) -> ParameterModifierSpec:
         sources = [
             self.value is not None,
             self.source_field is not None,
@@ -77,8 +78,8 @@ class ContextualParameterModifierSpec(BaseModel):
         ]
         if sum(sources) != 1:
             raise ValueError(
-                "contextual parameter modifiers must use exactly one of value, "
-                "source_field, or entity_name/entity_attribute"
+                "parameter modifiers must use exactly one of value, source_field, or "
+                "entity_name/entity_attribute"
             )
 
         if (self.entity_name is None) != (self.entity_attribute is None):
@@ -93,7 +94,7 @@ class ContextualDistributionGeneratorSpec(BaseModel):
     kind: Literal["contextual_distribution"]
     distribution: DistributionName
     parameters: dict[str, Any] = Field(default_factory=dict)
-    parameter_modifiers: list[ContextualParameterModifierSpec] = Field(default_factory=list)
+    parameter_modifiers: list[ParameterModifierSpec] = Field(default_factory=list)
 
 
 class ConstantGeneratorSpec(BaseModel):
@@ -274,15 +275,62 @@ MutationSpec = Annotated[
 ]
 
 
-class InjectorSpec(BaseModel):
+class ProcessModifierSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    injector_id: str
+    modifier_id: str
+    field: str
+    scope: list[FieldMatchSpec] = Field(default_factory=list)
+    selection: SelectionSpec
+    parameter_modifiers: list[ParameterModifierSpec] = Field(default_factory=list, min_length=1)
+    severity: float = Field(default=1.0, ge=0.0)
+
+
+class RowMutationSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mutation_id: str
     field: str
     scope: list[FieldMatchSpec] = Field(default_factory=list)
     selection: SelectionSpec
     mutation: MutationSpec
     severity: float = Field(default=1.0, ge=0.0)
+
+
+def _validate_entity_reference(
+    owner: str,
+    entity_name: str,
+    entity_attribute: str | None,
+    pool_attributes: dict[str, set[str]],
+) -> None:
+    if entity_name not in pool_attributes:
+        raise ValueError(f"{owner} references unknown entity pool: {entity_name}")
+
+    if entity_attribute is not None and entity_attribute not in pool_attributes[entity_name]:
+        raise ValueError(f"{owner} references unknown entity attribute: {entity_name}.{entity_attribute}")
+
+
+def _validate_parameter_modifier_references(
+    owner: str,
+    parameter_modifiers: list[ParameterModifierSpec],
+    pool_attributes: dict[str, set[str]],
+    available_fields: set[str],
+) -> None:
+    for parameter_modifier in parameter_modifiers:
+        if parameter_modifier.source_field is not None and parameter_modifier.source_field not in available_fields:
+            raise ValueError(f"{owner} references unavailable source field: {parameter_modifier.source_field}")
+
+        if parameter_modifier.entity_name is not None:
+            _validate_entity_reference(
+                owner,
+                parameter_modifier.entity_name,
+                parameter_modifier.entity_attribute,
+                pool_attributes,
+            )
+
+        for condition in parameter_modifier.when:
+            if condition.field not in available_fields:
+                raise ValueError(f"{owner} references unavailable condition field: {condition.field}")
 
 
 class ScenarioRequestBase(BaseModel):
@@ -294,13 +342,26 @@ class ScenarioRequestBase(BaseModel):
     seed: int | None = None
     entity_pools: list[EntityPoolSpec] = Field(default_factory=list)
     fields: list[FieldSpec]
-    injectors: list[InjectorSpec] = Field(default_factory=list)
+    process_modifiers: list[ProcessModifierSpec] = Field(default_factory=list)
+    mutations: list[RowMutationSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_entity_references(self) -> ScenarioRequestBase:
+    def validate_references(self) -> ScenarioRequestBase:
         pool_names = [pool.name for pool in self.entity_pools]
         if len(pool_names) != len(set(pool_names)):
             raise ValueError("entity pool names must be unique")
+
+        field_names = [field.name for field in self.fields]
+        if len(field_names) != len(set(field_names)):
+            raise ValueError("field names must be unique")
+
+        process_modifier_ids = [modifier.modifier_id for modifier in self.process_modifiers]
+        if len(process_modifier_ids) != len(set(process_modifier_ids)):
+            raise ValueError("process modifier ids must be unique")
+
+        mutation_ids = [mutation.mutation_id for mutation in self.mutations]
+        if len(mutation_ids) != len(set(mutation_ids)):
+            raise ValueError("mutation ids must be unique")
 
         pool_attributes: dict[str, set[str]] = {}
         for pool in self.entity_pools:
@@ -309,58 +370,76 @@ class ScenarioRequestBase(BaseModel):
                 raise ValueError(f"entity pool attributes must be unique: {pool.name}")
             pool_attributes[pool.name] = set(attribute_names)
 
+        field_generators: dict[str, GeneratorSpec] = {}
         for field in self.fields:
             generator = field.generator
 
             if generator.kind == "entity_id":
-                if generator.entity_name not in pool_attributes:
-                    raise ValueError(f"field {field.name} references unknown entity pool: {generator.entity_name}")
+                _validate_entity_reference(f"field {field.name}", generator.entity_name, None, pool_attributes)
 
             if generator.kind == "entity_attribute":
-                if generator.entity_name not in pool_attributes:
-                    raise ValueError(f"field {field.name} references unknown entity pool: {generator.entity_name}")
-                if generator.attribute not in pool_attributes[generator.entity_name]:
-                    raise ValueError(
-                        f"field {field.name} references unknown entity attribute: "
-                        f"{generator.entity_name}.{generator.attribute}"
-                    )
+                _validate_entity_reference(
+                    f"field {field.name}",
+                    generator.entity_name,
+                    generator.attribute,
+                    pool_attributes,
+                )
+
+            field_generators[field.name] = generator
 
         available_fields: set[str] = set()
         for field in self.fields:
             generator = field.generator
 
             if generator.kind == "contextual_distribution":
-                for modifier in generator.parameter_modifiers:
-                    if modifier.source_field is not None and modifier.source_field not in available_fields:
+                _validate_parameter_modifier_references(
+                    f"field {field.name}",
+                    generator.parameter_modifiers,
+                    pool_attributes,
+                    available_fields,
+                )
+
+            field_process_modifiers = [
+                process_modifier for process_modifier in self.process_modifiers if process_modifier.field == field.name
+            ]
+            if field_process_modifiers and generator.kind not in {"distribution", "contextual_distribution"}:
+                raise ValueError(
+                    f"process modifiers can only target distribution fields; invalid field: {field.name}"
+                )
+
+            for process_modifier in field_process_modifiers:
+                for match in process_modifier.scope:
+                    if match.field not in available_fields:
                         raise ValueError(
-                            f"field {field.name} references unavailable source field: {modifier.source_field}"
+                            f"process modifier {process_modifier.modifier_id} references unavailable scope field: "
+                            f"{match.field}"
                         )
 
-                    if modifier.entity_name is not None:
-                        if modifier.entity_name not in pool_attributes:
-                            raise ValueError(
-                                f"field {field.name} references unknown entity pool: {modifier.entity_name}"
-                            )
-                        if modifier.entity_attribute not in pool_attributes[modifier.entity_name]:
-                            raise ValueError(
-                                f"field {field.name} references unknown entity attribute: "
-                                f"{modifier.entity_name}.{modifier.entity_attribute}"
-                            )
-
-                    for condition in modifier.when:
-                        if condition.field not in available_fields:
-                            raise ValueError(
-                                f"field {field.name} references unavailable condition field: {condition.field}"
-                            )
+                _validate_parameter_modifier_references(
+                    f"process modifier {process_modifier.modifier_id}",
+                    process_modifier.parameter_modifiers,
+                    pool_attributes,
+                    available_fields,
+                )
 
             available_fields.add(field.name)
 
-        all_field_names = {field.name for field in self.fields}
-        for injector in self.injectors:
-            for match in injector.scope:
+        all_field_names = set(field_generators)
+        for process_modifier in self.process_modifiers:
+            if process_modifier.field not in all_field_names:
+                raise ValueError(
+                    f"process modifier {process_modifier.modifier_id} references unknown field: "
+                    f"{process_modifier.field}"
+                )
+
+        for mutation in self.mutations:
+            if mutation.field not in all_field_names:
+                raise ValueError(f"mutation {mutation.mutation_id} references unknown field: {mutation.field}")
+
+            for match in mutation.scope:
                 if match.field not in all_field_names:
                     raise ValueError(
-                        f"injector {injector.injector_id} references unknown scope field: {match.field}"
+                        f"mutation {mutation.mutation_id} references unknown scope field: {match.field}"
                     )
 
         return self

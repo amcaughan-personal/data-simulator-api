@@ -30,9 +30,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "spike_1",
+                        "mutation_id": "spike_1",
                         "field": "value",
                         "selection": {
                             "kind": "index",
@@ -54,13 +54,13 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["label_summary"]["anomalous_rows"], 1)
         self.assertTrue(payload["rows"][2]["__is_anomaly"])
         label = payload["rows"][2]["__labels"][0]
-        self.assertEqual(label["injector_id"], "spike_1")
+        self.assertEqual(label["mutation_id"], "spike_1")
         self.assertEqual(label["selection_kind"], "index")
         self.assertEqual(label["applied_mutation"]["factor"], 10.0)
         self.assertAlmostEqual(label["mutated_value"], label["original_value"] * 10.0)
         self.assertAlmostEqual(payload["rows"][2]["value"], label["mutated_value"])
 
-    def test_generate_scenario_supports_rate_based_injectors(self):
+    def test_generate_scenario_supports_rate_based_mutations(self):
         request = ScenarioGenerateRequest.model_validate(
             {
                 "name": "rate_generate",
@@ -76,9 +76,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "random_spikes",
+                        "mutation_id": "random_spikes",
                         "field": "value",
                         "selection": {
                             "kind": "rate",
@@ -117,9 +117,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "three_scales",
+                        "mutation_id": "three_scales",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -145,6 +145,23 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "deterministic_generate",
                 "seed": 23,
                 "row_count": 10,
+                "process_modifiers": [
+                    {
+                        "modifier_id": "mean_shift",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 2,
+                        },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": 1.5,
+                            }
+                        ],
+                    }
+                ],
                 "fields": [
                     {
                         "name": "value",
@@ -155,9 +172,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "three_scales",
+                        "mutation_id": "three_scales",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -381,10 +398,54 @@ class ScenarioEngineTest(unittest.TestCase):
 
         self.assertEqual([row["amount"] for row in payload["rows"]], [15.0, 15.0, 15.0, 15.0])
 
-    def test_generate_scenario_supports_scoped_injectors(self):
+    def test_generate_scenario_supports_process_modifiers(self):
         request = ScenarioGenerateRequest.model_validate(
             {
-                "name": "scoped_injectors",
+                "name": "process_modifier_generate",
+                "seed": 43,
+                "row_count": 5,
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 0.0},
+                        },
+                    }
+                ],
+                "process_modifiers": [
+                    {
+                        "modifier_id": "regime_shift",
+                        "field": "value",
+                        "selection": {
+                            "kind": "window",
+                            "start_index": 2,
+                        },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": 5.0,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertEqual([row["value"] for row in payload["rows"]], [10.0, 10.0, 15.0, 15.0, 15.0])
+        label = payload["rows"][2]["__labels"][0]
+        self.assertEqual(label["label_source"], "process_modifier")
+        self.assertEqual(label["modifier_id"], "regime_shift")
+        self.assertEqual(label["generated_value"], 15.0)
+
+    def test_generate_scenario_supports_scoped_mutations(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "scoped_mutations",
                 "seed": 43,
                 "row_count": 6,
                 "fields": [
@@ -405,9 +466,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     },
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "target_only",
+                        "mutation_id": "target_only",
                         "field": "value",
                         "scope": [{"field": "segment", "equals": "target"}],
                         "selection": {
@@ -466,9 +527,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "too_many",
+                        "mutation_id": "too_many",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -486,7 +547,7 @@ class ScenarioEngineTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "count selection requires count <= eligible_row_count"):
             generate_scenario(request)
 
-    def test_sample_scenario_supports_stateless_injectors(self):
+    def test_sample_scenario_supports_sample_compatible_mutations(self):
         request = ScenarioSampleRequest.model_validate(
             {
                 "name": "sample_once",
@@ -501,9 +562,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "always_scale",
+                        "mutation_id": "always_scale",
                         "field": "value",
                         "selection": {
                             "kind": "rate",
@@ -522,7 +583,7 @@ class ScenarioEngineTest(unittest.TestCase):
 
         self.assertEqual(payload["scenario_name"], "sample_once")
         self.assertTrue(payload["row"]["__is_anomaly"])
-        self.assertEqual(payload["row"]["__labels"][0]["injector_id"], "always_scale")
+        self.assertEqual(payload["row"]["__labels"][0]["mutation_id"], "always_scale")
 
     def test_sample_scenario_supports_count_selection(self):
         request = ScenarioSampleRequest.model_validate(
@@ -539,9 +600,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "single_pick",
+                        "mutation_id": "single_pick",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -566,6 +627,23 @@ class ScenarioEngineTest(unittest.TestCase):
             {
                 "name": "deterministic_sample",
                 "seed": 5,
+                "process_modifiers": [
+                    {
+                        "modifier_id": "single_shift",
+                        "field": "value",
+                        "selection": {
+                            "kind": "count",
+                            "count": 1,
+                        },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "set",
+                                "value": 14.0,
+                            }
+                        ],
+                    }
+                ],
                 "fields": [
                     {
                         "name": "value",
@@ -576,9 +654,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "single_pick",
+                        "mutation_id": "single_pick",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -614,9 +692,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "too_many",
+                        "mutation_id": "too_many",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -649,9 +727,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "indexed_spike",
+                        "mutation_id": "indexed_spike",
                         "field": "value",
                         "selection": {
                             "kind": "index",
@@ -666,7 +744,46 @@ class ScenarioEngineTest(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "stateless injectors"):
+        with self.assertRaisesRegex(ValueError, "sample-compatible mutations"):
+            sample_scenario(request)
+
+    def test_sample_scenario_rejects_non_sample_compatible_process_modifiers(self):
+        request = ScenarioSampleRequest.model_validate(
+            {
+                "name": "invalid_process_modifier_sample",
+                "seed": 5,
+                "fields": [
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 7.0, "stddev": 1.0},
+                        },
+                    }
+                ],
+                "process_modifiers": [
+                    {
+                        "modifier_id": "window_shift",
+                        "field": "value",
+                        "selection": {
+                            "kind": "window",
+                            "start_index": 0,
+                            "end_index": 1,
+                        },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": 2.0,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "sample-compatible process modifiers"):
             sample_scenario(request)
 
     def test_generate_scenario_supports_ranged_mutations(self):
@@ -685,9 +802,9 @@ class ScenarioEngineTest(unittest.TestCase):
                         },
                     }
                 ],
-                "injectors": [
+                "mutations": [
                     {
-                        "injector_id": "ranged_offset",
+                        "mutation_id": "ranged_offset",
                         "field": "value",
                         "selection": {
                             "kind": "count",
@@ -853,9 +970,9 @@ class ScenarioEngineTest(unittest.TestCase):
                     },
                 }
             ],
-            "injectors": [
+            "mutations": [
                 {
-                    "injector_id": "indexed_spike",
+                    "mutation_id": "indexed_spike",
                     "field": "value",
                     "selection": {
                         "kind": "index",

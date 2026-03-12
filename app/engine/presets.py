@@ -252,9 +252,26 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                     },
                 },
             ],
-            "injectors": [
+            "process_modifiers": [
                 {
-                    "injector_id": "amount_spike",
+                    "modifier_id": "amount_regime_shift",
+                    "field": "amount",
+                    "selection": {
+                        "kind": "window",
+                        "start_index": regime_start,
+                    },
+                    "parameter_modifiers": [
+                        {
+                            "parameter": "mean",
+                            "operation": "add",
+                            "value": float(overrides.get("regime_amount_mean_shift", 0.4)),
+                        }
+                    ],
+                },
+            ],
+            "mutations": [
+                {
+                    "mutation_id": "amount_spike",
                     "field": "amount",
                     "scope": [
                         {
@@ -269,18 +286,6 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                     "mutation": {
                         "kind": "scale",
                         "factor": float(overrides.get("anomaly_scale", 6.0)),
-                    },
-                },
-                {
-                    "injector_id": "amount_regime_shift",
-                    "field": "amount",
-                    "selection": {
-                        "kind": "window",
-                        "start_index": regime_start,
-                    },
-                    "mutation": {
-                        "kind": "offset",
-                        "amount": float(overrides.get("regime_amount_offset", 35.0)),
                     },
                 },
             ],
@@ -440,9 +445,32 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
                     },
                 },
             ],
-            "injectors": [
+            "process_modifiers": [
                 {
-                    "injector_id": "sensor_dropout",
+                    "modifier_id": "pressure_regime_shift",
+                    "field": "pressure_kpa",
+                    "scope": [
+                        {
+                            "field": "device_type",
+                            "equals": "combo_sensor",
+                        }
+                    ],
+                    "selection": {
+                        "kind": "window",
+                        "start_index": max(1, row_count // 2),
+                    },
+                    "parameter_modifiers": [
+                        {
+                            "parameter": "mean",
+                            "operation": "add",
+                            "value": float(overrides.get("pressure_regime_shift", 1.4)),
+                        }
+                    ],
+                },
+            ],
+            "mutations": [
+                {
+                    "mutation_id": "sensor_dropout",
                     "field": "pressure_kpa",
                     "scope": [
                         {
@@ -460,7 +488,7 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
                     },
                 },
                 {
-                    "injector_id": "sensor_stuck",
+                    "mutation_id": "sensor_stuck",
                     "field": "temperature_c",
                     "scope": [
                         {
@@ -688,9 +716,32 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                     },
                 },
             ],
-            "injectors": [
+            "process_modifiers": [
                 {
-                    "injector_id": "order_amount_spike",
+                    "modifier_id": "marketplace_order_shift",
+                    "field": "order_amount",
+                    "scope": [
+                        {
+                            "field": "sales_channel",
+                            "equals": "marketplace",
+                        }
+                    ],
+                    "selection": {
+                        "kind": "window",
+                        "start_index": delay_start,
+                    },
+                    "parameter_modifiers": [
+                        {
+                            "parameter": "mean",
+                            "operation": "add",
+                            "value": float(overrides.get("marketplace_amount_shift", 0.24)),
+                        }
+                    ],
+                },
+            ],
+            "mutations": [
+                {
+                    "mutation_id": "order_amount_spike",
                     "field": "order_amount",
                     "scope": [
                         {
@@ -709,7 +760,7 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                     },
                 },
                 {
-                    "injector_id": "fulfillment_delay",
+                    "mutation_id": "fulfillment_delay",
                     "field": "fulfillment_status",
                     "scope": [
                         {
