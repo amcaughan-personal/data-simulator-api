@@ -48,27 +48,143 @@ resource "aws_api_gateway_rest_api" "private" {
   }
 }
 
-resource "aws_api_gateway_resource" "proxy" {
+resource "aws_api_gateway_resource" "health" {
   rest_api_id = aws_api_gateway_rest_api.private.id
   parent_id   = aws_api_gateway_rest_api.private.root_resource_id
-  path_part   = "{proxy+}"
+  path_part   = "health"
 }
 
-resource "aws_api_gateway_method" "proxy_any" {
-  rest_api_id   = aws_api_gateway_rest_api.private.id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = "ANY"
-  authorization = "NONE"
+resource "aws_api_gateway_resource" "v1" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_rest_api.private.root_resource_id
+  path_part   = "v1"
+}
 
-  request_parameters = {
-    "method.request.path.proxy" = true
+resource "aws_api_gateway_resource" "distributions" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "distributions"
+}
+
+resource "aws_api_gateway_resource" "distribution_sample" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.distributions.id
+  path_part   = "sample"
+}
+
+resource "aws_api_gateway_resource" "distribution_generate" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.distributions.id
+  path_part   = "generate"
+}
+
+resource "aws_api_gateway_resource" "scenarios" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "scenarios"
+}
+
+resource "aws_api_gateway_resource" "scenario_sample" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.scenarios.id
+  path_part   = "sample"
+}
+
+resource "aws_api_gateway_resource" "scenario_generate" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.scenarios.id
+  path_part   = "generate"
+}
+
+resource "aws_api_gateway_resource" "presets" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "presets"
+}
+
+resource "aws_api_gateway_resource" "preset_id" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.presets.id
+  path_part   = "{preset_id}"
+}
+
+resource "aws_api_gateway_resource" "preset_generate" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.preset_id.id
+  path_part   = "generate"
+}
+
+resource "aws_api_gateway_resource" "preset_sample" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.preset_id.id
+  path_part   = "sample"
+}
+
+locals {
+  private_api_routes = {
+    health_get = {
+      resource_id        = aws_api_gateway_resource.health.id
+      http_method        = "GET"
+      request_parameters = {}
+    }
+    distributions_sample_post = {
+      resource_id        = aws_api_gateway_resource.distribution_sample.id
+      http_method        = "POST"
+      request_parameters = {}
+    }
+    distributions_generate_post = {
+      resource_id        = aws_api_gateway_resource.distribution_generate.id
+      http_method        = "POST"
+      request_parameters = {}
+    }
+    scenarios_sample_post = {
+      resource_id        = aws_api_gateway_resource.scenario_sample.id
+      http_method        = "POST"
+      request_parameters = {}
+    }
+    scenarios_generate_post = {
+      resource_id        = aws_api_gateway_resource.scenario_generate.id
+      http_method        = "POST"
+      request_parameters = {}
+    }
+    presets_get = {
+      resource_id        = aws_api_gateway_resource.presets.id
+      http_method        = "GET"
+      request_parameters = {}
+    }
+    preset_generate_post = {
+      resource_id = aws_api_gateway_resource.preset_generate.id
+      http_method = "POST"
+      request_parameters = {
+        "method.request.path.preset_id" = true
+      }
+    }
+    preset_sample_post = {
+      resource_id = aws_api_gateway_resource.preset_sample.id
+      http_method = "POST"
+      request_parameters = {
+        "method.request.path.preset_id" = true
+      }
+    }
   }
 }
 
-resource "aws_api_gateway_integration" "proxy_any" {
+resource "aws_api_gateway_method" "route" {
+  for_each = local.private_api_routes
+
+  rest_api_id        = aws_api_gateway_rest_api.private.id
+  resource_id        = each.value.resource_id
+  http_method        = each.value.http_method
+  authorization      = "AWS_IAM"
+  request_parameters = each.value.request_parameters
+}
+
+resource "aws_api_gateway_integration" "route" {
+  for_each = local.private_api_routes
+
   rest_api_id             = aws_api_gateway_rest_api.private.id
-  resource_id             = aws_api_gateway_resource.proxy.id
-  http_method             = aws_api_gateway_method.proxy_any.http_method
+  resource_id             = each.value.resource_id
+  http_method             = aws_api_gateway_method.route[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.this.invoke_arn
@@ -79,9 +195,22 @@ resource "aws_api_gateway_deployment" "private" {
 
   triggers = {
     redeployment = sha1(jsonencode({
-      proxy_integration = aws_api_gateway_integration.proxy_any.id
-      proxy_method      = aws_api_gateway_method.proxy_any.id
-      proxy_resource    = aws_api_gateway_resource.proxy.id
+      resource_ids = {
+        distribution_generate = aws_api_gateway_resource.distribution_generate.id
+        distribution_sample   = aws_api_gateway_resource.distribution_sample.id
+        distributions         = aws_api_gateway_resource.distributions.id
+        health                = aws_api_gateway_resource.health.id
+        preset_generate       = aws_api_gateway_resource.preset_generate.id
+        preset_id             = aws_api_gateway_resource.preset_id.id
+        preset_sample         = aws_api_gateway_resource.preset_sample.id
+        presets               = aws_api_gateway_resource.presets.id
+        scenario_generate     = aws_api_gateway_resource.scenario_generate.id
+        scenario_sample       = aws_api_gateway_resource.scenario_sample.id
+        scenarios             = aws_api_gateway_resource.scenarios.id
+        v1                    = aws_api_gateway_resource.v1.id
+      }
+      method_ids      = { for route_name, route in aws_api_gateway_method.route : route_name => route.id }
+      integration_ids = { for route_name, route in aws_api_gateway_integration.route : route_name => route.id }
     }))
   }
 

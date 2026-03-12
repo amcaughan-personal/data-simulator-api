@@ -29,15 +29,24 @@ This package contains the Lambda application code for the data simulator API.
 
 ## Current API Surface
 
-- `/health`
-- `/v1/distributions/sample`
-- `/v1/distributions/generate`
-- `/v1/scenarios/sample`
-- `/v1/scenarios/generate`
-- `/v1/presets`
-- `/v1/presets/{preset_id}/generate`
+- `GET /health`
+- `POST /v1/distributions/sample`
+- `POST /v1/distributions/generate`
+- `POST /v1/scenarios/sample`
+- `POST /v1/scenarios/generate`
+- `GET /v1/presets`
+- `POST /v1/presets/{preset_id}/sample`
+- `POST /v1/presets/{preset_id}/generate`
 
 ## Sample Requests
+
+HTTP callers should use the methods above and send the JSON body without an `action`
+field. The `action` examples below are direct Lambda invocation payloads, which are
+still useful for local smoke testing and `aws lambda invoke`.
+
+The private API Gateway methods use `AWS_IAM` authorization. Internal callers should
+use SigV4-signed requests from an AWS principal that has `execute-api:Invoke`
+permission, typically an ECS task role or another workload role inside the shared VPC.
 
 ### Health
 
@@ -821,15 +830,30 @@ include repeated batch metadata such as `source_system_id`, `delivery_id`, and
 `delivery_date`, plus row-level fields such as `record_number`, `member_id`,
 `facility_id`, `plan_tier`, and `allowed_amount`.
 
+### Preset Sample
+
+Some presets also support `/sample`, which returns one streaming-style row using the
+same preset dimensions and entity logic. This is useful for transaction or telemetry
+simulators where one call can represent one live event.
+
+```json
+{
+  "action": "/v1/presets/transaction_benchmark/sample",
+  "seed": 17
+}
+```
+
+Batch-oriented presets such as `batch_delivery_benchmark` are intentionally generate-only.
+
 Current presets:
 - `batch_delivery_benchmark`
-  one batch-delivered client file per API call, with source-system, delivery, facility, and member-style fields
+  one batch-delivered client file per API call, with source-system, delivery, facility, and member-style fields; does not support `/sample`
 - `transaction_benchmark`
-  card and merchant IDs with stable merchant and card dimensions, plus a generation-time amount regime shift
+  card and merchant IDs with stable merchant and card dimensions, plus a generation-time amount regime shift; supports `/sample`
 - `iot_sensor_benchmark`
-  device and site IDs with telemetry mutations and a generation-time pressure regime shift
+  device and site IDs with telemetry mutations and a generation-time pressure regime shift; supports `/sample`
 - `order_benchmark`
-  customer and product IDs with generation-time marketplace shifts and fulfillment mutations
+  customer and product IDs with generation-time marketplace shifts and fulfillment mutations; supports `/sample`
 
 ### Lambda Invoke Example
 
@@ -858,9 +882,11 @@ Pass a different function name if needed:
 ## Private API Deployment
 
 The `dev` stack can also create a private REST API Gateway in front of the Lambda.
-That API is scoped to the shared dev VPC published by `aws_infra`, but it is not tied
-to a specific `execute-api` VPC endpoint ID. Recreating the endpoint layer should not
-require reapplying this repo as long as the shared VPC stays the same.
+That API is scoped to the shared dev VPC published by `aws_infra`, uses explicit route
+definitions at the API Gateway layer, and requires `AWS_IAM` authorization on every
+method. It is not tied to a specific `execute-api` VPC endpoint ID. Recreating the
+endpoint layer should not require reapplying this repo as long as the shared VPC stays
+the same.
 
 ## Design Notes
 
