@@ -12,6 +12,8 @@ This package contains the Lambda application code for the data simulator API.
   route resolution and request handling
 - `engine/distributions.py`
   primitive distribution sampling and summaries
+- `engine/entities.py`
+  entity pools and stable per-row entity assignment
 - `engine/scenario.py`
   scenario generation
 - `engine/injectors.py`
@@ -173,6 +175,84 @@ Offset mutations accept either a fixed `amount` or a ranged `min_amount` / `max_
 
 Providing a `seed` makes scenario outputs deterministic for the same request. If `time.start` is omitted on a seeded scenario, the engine uses a fixed UTC baseline so event timestamps are deterministic too.
 
+### Scenario Generate With Entities
+
+Entity pools make it possible to emit repeated IDs and stable per-entity dimensions.
+That is useful for downstream ELT work because the generated rows can be grouped by
+things like `customer_id`, `merchant_id`, `device_id`, or `product_id`.
+
+```json
+{
+  "action": "/v1/scenarios/generate",
+  "name": "entity_generate",
+  "seed": 29,
+  "row_count": 12,
+  "time": {
+    "frequency_seconds": 300
+  },
+  "entity_pools": [
+    {
+      "name": "customers",
+      "count": 3,
+      "id_prefix": "customer",
+      "attributes": [
+        {
+          "name": "customer_region",
+          "generator": {
+            "kind": "categorical",
+            "values": ["west", "south", "northeast"]
+          }
+        },
+        {
+          "name": "loyalty_tier",
+          "generator": {
+            "kind": "categorical",
+            "values": ["standard", "gold"],
+            "weights": [0.8, 0.2]
+          }
+        }
+      ]
+    }
+  ],
+  "fields": [
+    {
+      "name": "customer_id",
+      "generator": {
+        "kind": "entity_id",
+        "entity_name": "customers"
+      }
+    },
+    {
+      "name": "customer_region",
+      "generator": {
+        "kind": "entity_attribute",
+        "entity_name": "customers",
+        "attribute": "customer_region"
+      }
+    },
+    {
+      "name": "loyalty_tier",
+      "generator": {
+        "kind": "entity_attribute",
+        "entity_name": "customers",
+        "attribute": "loyalty_tier"
+      }
+    },
+    {
+      "name": "amount",
+      "generator": {
+        "kind": "distribution",
+        "distribution": "lognormal",
+        "parameters": {
+          "mean": 3.5,
+          "stddev": 0.3
+        }
+      }
+    }
+  ]
+}
+```
+
 ### List Presets
 
 ```json
@@ -194,6 +274,14 @@ Providing a `seed` makes scenario outputs deterministic for the same request. If
   }
 }
 ```
+
+Current presets:
+- `transaction_benchmark`
+  card and merchant IDs with stable merchant and card dimensions
+- `iot_sensor_benchmark`
+  device and site IDs with telemetry anomalies
+- `order_benchmark`
+  customer and product IDs with order amount and fulfillment anomalies
 
 ### Lambda Invoke Example
 
