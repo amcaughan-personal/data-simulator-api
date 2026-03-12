@@ -35,6 +35,7 @@ This package contains the Lambda application code for the data simulator API.
 - `POST /v1/scenarios/sample`
 - `POST /v1/scenarios/generate`
 - `GET /v1/presets`
+- `POST /v1/presets/{preset_id}/sample`
 - `POST /v1/presets/{preset_id}/generate`
 
 ## Sample Requests
@@ -829,15 +830,30 @@ include repeated batch metadata such as `source_system_id`, `delivery_id`, and
 `delivery_date`, plus row-level fields such as `record_number`, `member_id`,
 `facility_id`, `plan_tier`, and `allowed_amount`.
 
+### Preset Sample
+
+Some presets also support `/sample`, which returns one streaming-style row using the
+same preset dimensions and entity logic. This is useful for transaction or telemetry
+simulators where one call can represent one live event.
+
+```json
+{
+  "action": "/v1/presets/transaction_benchmark/sample",
+  "seed": 17
+}
+```
+
+Batch-oriented presets such as `batch_delivery_benchmark` are intentionally generate-only.
+
 Current presets:
 - `batch_delivery_benchmark`
-  one batch-delivered client file per API call, with source-system, delivery, facility, and member-style fields
+  one batch-delivered client file per API call, with source-system, delivery, facility, and member-style fields; does not support `/sample`
 - `transaction_benchmark`
-  card and merchant IDs with stable merchant and card dimensions, plus a generation-time amount regime shift
+  card and merchant IDs with stable merchant and card dimensions, plus a generation-time amount regime shift; supports `/sample`
 - `iot_sensor_benchmark`
-  device and site IDs with telemetry mutations and a generation-time pressure regime shift
+  device and site IDs with telemetry mutations and a generation-time pressure regime shift; supports `/sample`
 - `order_benchmark`
-  customer and product IDs with generation-time marketplace shifts and fulfillment mutations
+  customer and product IDs with generation-time marketplace shifts and fulfillment mutations; supports `/sample`
 
 ### Lambda Invoke Example
 
