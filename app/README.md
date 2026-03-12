@@ -219,6 +219,12 @@ Pass a different function name if needed:
 ./scripts/smoke_test_lambda.sh data-simulator-api-prod
 ```
 
+## Private API Deployment
+
+The `dev` infrastructure stack can also create a private REST API Gateway in front of the Lambda. It reads the shared VPC and `execute-api` endpoint identifiers from SSM Parameter Store entries created by `aws_infra`.
+
+The resulting invoke URL is only reachable from inside the shared dev VPC through the configured interface endpoint.
+
 ## Design Notes
 
 - `handler.py` should stay thin.
