@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
 from app.api.models import FieldSpec, ScenarioGenerateRequest, ScenarioRequestBase, ScenarioSampleRequest
 from app.engine.entities import EntityContext, build_entity_context, generate_entity_values
 from app.engine.generators import generate_contextual_distribution_values, generate_primitive_values
@@ -11,9 +9,6 @@ from app.engine.injectors import (
     summarize_labels,
     validate_stateless_injectors,
 )
-
-
-DEFAULT_SCENARIO_START = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
 
 def _generate_field_values(
@@ -37,27 +32,12 @@ def _generate_field_values(
     raise ValueError(f"unsupported generator kind: {generator.kind}")
 
 
-def _scenario_start_time(request: ScenarioRequestBase) -> datetime:
-    if request.time.start is not None:
-        return request.time.start
-    if request.seed is not None:
-        return DEFAULT_SCENARIO_START
-    return datetime.now(timezone.utc)
-
-
 def _build_rows(request: ScenarioRequestBase, row_count: int, stateless_only: bool = False) -> list[dict[str, Any]]:
     if stateless_only:
         validate_stateless_injectors(request.injectors)
-    start_time = _scenario_start_time(request)
     entity_context = build_entity_context(request.entity_pools, row_count, request.seed)
 
-    rows = [
-        {
-            "__row_index": index,
-            "event_ts": (start_time + timedelta(seconds=index * request.time.frequency_seconds)).isoformat(),
-        }
-        for index in range(row_count)
-    ]
+    rows = [{"__row_index": index} for index in range(row_count)]
 
     for field in request.fields:
         values = _generate_field_values(field, rows, request.seed, entity_context)

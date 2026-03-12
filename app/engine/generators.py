@@ -8,6 +8,7 @@ from app.api.models import (
     ContextualDistributionGeneratorSpec,
     DistributionGeneratorSpec,
     FieldMatchSpec,
+    SequenceGeneratorSpec,
 )
 from app.engine.distributions import resolve_distribution_parameter, sample_distribution
 from app.engine.randomness import derive_seed
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from app.engine.entities import EntityContext
 
 
-PrimitiveGenerator = DistributionGeneratorSpec | ConstantGeneratorSpec | CategoricalGeneratorSpec
+PrimitiveGenerator = DistributionGeneratorSpec | SequenceGeneratorSpec | ConstantGeneratorSpec | CategoricalGeneratorSpec
 
 
 def generate_primitive_values(
@@ -29,6 +30,9 @@ def generate_primitive_values(
 
     if generator.kind == "constant":
         return [generator.value for _ in range(row_count)]
+
+    if generator.kind == "sequence":
+        return [generator.start + (index * generator.step) for index in range(row_count)]
 
     if generator.kind == "categorical":
         return sample_distribution(

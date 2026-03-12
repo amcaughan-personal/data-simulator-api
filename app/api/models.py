@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -35,20 +34,20 @@ class DistributionGenerateRequest(DistributionRequestBase):
     count: int = Field(default=100, ge=1, le=5000)
     summary: bool = False
 
-
-class TimeSpec(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    start: datetime | None = None
-    frequency_seconds: int = Field(default=60, ge=1)
-
-
 class DistributionGeneratorSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["distribution"]
     distribution: DistributionName
     parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class SequenceGeneratorSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["sequence"]
+    start: int | float = 0
+    step: int | float = 1
 
 
 class FieldMatchSpec(BaseModel):
@@ -113,7 +112,7 @@ class CategoricalGeneratorSpec(BaseModel):
 
 
 PrimitiveGeneratorSpec = Annotated[
-    DistributionGeneratorSpec | ConstantGeneratorSpec | CategoricalGeneratorSpec,
+    DistributionGeneratorSpec | SequenceGeneratorSpec | ConstantGeneratorSpec | CategoricalGeneratorSpec,
     Field(discriminator="kind"),
 ]
 
@@ -136,6 +135,7 @@ class EntityAttributeGeneratorSpec(BaseModel):
 GeneratorSpec = Annotated[
     DistributionGeneratorSpec
     | ContextualDistributionGeneratorSpec
+    | SequenceGeneratorSpec
     | ConstantGeneratorSpec
     | CategoricalGeneratorSpec
     | EntityIdGeneratorSpec
@@ -292,7 +292,6 @@ class ScenarioRequestBase(BaseModel):
     name: str = "scenario"
     description: str | None = None
     seed: int | None = None
-    time: TimeSpec = Field(default_factory=TimeSpec)
     entity_pools: list[EntityPoolSpec] = Field(default_factory=list)
     fields: list[FieldSpec]
     injectors: list[InjectorSpec] = Field(default_factory=list)
