@@ -1161,6 +1161,28 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["count"], 4)
         self.assertIn("summary", payload)
 
+    def test_handler_routes_distribution_generate_over_http(self):
+        event = {
+            "rawPath": "/v1/distributions/generate",
+            "httpMethod": "POST",
+            "body": json.dumps(
+                {
+                    "distribution": "uniform",
+                    "parameters": {"low": 1.0, "high": 2.0},
+                    "count": 4,
+                    "summary": True,
+                    "seed": 2,
+                }
+            ),
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(payload["count"], 4)
+        self.assertIn("summary", payload)
+
     def test_handler_routes_preset_generate(self):
         event = {
             "action": "/v1/presets/iot_sensor_benchmark/generate",
@@ -1174,6 +1196,18 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(payload["scenario_name"], "iot_sensor_benchmark")
         self.assertEqual(len(payload["rows"]), 8)
+
+    def test_handler_routes_presets_list_over_http(self):
+        event = {
+            "rawPath": "/v1/presets",
+            "httpMethod": "GET",
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertIn("presets", payload)
 
     def test_handler_allows_get_health_for_http_requests(self):
         event = {
