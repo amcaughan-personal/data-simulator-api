@@ -182,6 +182,156 @@ class ScenarioEngineTest(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_generate_scenario_supports_entity_pools(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "entity_generate",
+                "seed": 29,
+                "row_count": 12,
+                "time": {"frequency_seconds": 300},
+                "entity_pools": [
+                    {
+                        "name": "customers",
+                        "count": 3,
+                        "id_prefix": "customer",
+                        "attributes": [
+                            {
+                                "name": "customer_region",
+                                "generator": {
+                                    "kind": "categorical",
+                                    "values": ["west", "south", "northeast"],
+                                },
+                            },
+                            {
+                                "name": "loyalty_tier",
+                                "generator": {
+                                    "kind": "categorical",
+                                    "values": ["standard", "gold"],
+                                    "weights": [0.8, 0.2],
+                                },
+                            },
+                        ],
+                    }
+                ],
+                "fields": [
+                    {
+                        "name": "customer_id",
+                        "generator": {
+                            "kind": "entity_id",
+                            "entity_name": "customers",
+                        },
+                    },
+                    {
+                        "name": "customer_region",
+                        "generator": {
+                            "kind": "entity_attribute",
+                            "entity_name": "customers",
+                            "attribute": "customer_region",
+                        },
+                    },
+                    {
+                        "name": "loyalty_tier",
+                        "generator": {
+                            "kind": "entity_attribute",
+                            "entity_name": "customers",
+                            "attribute": "loyalty_tier",
+                        },
+                    },
+                    {
+                        "name": "amount",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "lognormal",
+                            "parameters": {"mean": 3.5, "stddev": 0.3},
+                        },
+                    },
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+        entity_values: dict[str, tuple[str, str]] = {}
+
+        self.assertEqual(payload["scenario_name"], "entity_generate")
+        self.assertEqual(payload["row_count"], 12)
+        self.assertIn("customer_id", payload["fields"])
+
+        for row in payload["rows"]:
+            entity_key = row["customer_id"]
+            entity_attributes = (row["customer_region"], row["loyalty_tier"])
+            if entity_key in entity_values:
+                self.assertEqual(entity_values[entity_key], entity_attributes)
+            else:
+                entity_values[entity_key] = entity_attributes
+
+        self.assertLess(len(entity_values), payload["row_count"])
+
+    def test_generate_scenario_entity_output_is_deterministic_for_seed(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "deterministic_entity_generate",
+                "seed": 31,
+                "row_count": 10,
+                "time": {"frequency_seconds": 120},
+                "entity_pools": [
+                    {
+                        "name": "devices",
+                        "count": 4,
+                        "attributes": [
+                            {
+                                "name": "site_id",
+                                "generator": {
+                                    "kind": "categorical",
+                                    "values": ["site_001", "site_002"],
+                                },
+                            }
+                        ],
+                    }
+                ],
+                "fields": [
+                    {
+                        "name": "device_id",
+                        "generator": {
+                            "kind": "entity_id",
+                            "entity_name": "devices",
+                        },
+                    },
+                    {
+                        "name": "site_id",
+                        "generator": {
+                            "kind": "entity_attribute",
+                            "entity_name": "devices",
+                            "attribute": "site_id",
+                        },
+                    },
+                ],
+            }
+        )
+
+        first = generate_scenario(request)
+        second = generate_scenario(request)
+
+        self.assertEqual(first, second)
+
+    def test_scenario_rejects_unknown_entity_reference(self):
+        with self.assertRaisesRegex(ValueError, "unknown entity pool"):
+            ScenarioGenerateRequest.model_validate(
+                {
+                    "name": "bad_entity_generate",
+                    "seed": 13,
+                    "row_count": 2,
+                    "fields": [
+                        {
+                            "name": "customer_id",
+                            "generator": {
+                                "kind": "entity_id",
+                                "entity_name": "customers",
+                            },
+                        }
+                    ],
+                }
+            )
+
     def test_generate_scenario_rejects_count_selection_above_row_count(self):
         request = ScenarioGenerateRequest.model_validate(
             {
@@ -464,6 +614,9 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(payload["scenario_name"], "transaction_benchmark")
         self.assertEqual(payload["row_count"], 12)
         self.assertIn("amount", payload["fields"])
+        self.assertIn("card_id", payload["fields"])
+        self.assertIn("merchant_id", payload["fields"])
+        self.assertIn("merchant_category", payload["fields"])
 
     def test_preset_generate_is_deterministic_for_seed(self):
         request = build_preset_generate_request(
@@ -475,6 +628,32 @@ class ScenarioEngineTest(unittest.TestCase):
         second = generate_scenario(request)
 
         self.assertEqual(first, second)
+
+    def test_iot_preset_includes_device_dimensions(self):
+        request = build_preset_generate_request(
+            "iot_sensor_benchmark",
+            PresetGenerateRequest(seed=5, row_count=8, overrides={}),
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertIn("device_id", payload["fields"])
+        self.assertIn("site_id", payload["fields"])
+        self.assertIn("device_type", payload["fields"])
+
+    def test_order_preset_generate_builds_rows(self):
+        request = build_preset_generate_request(
+            "order_benchmark",
+            PresetGenerateRequest(seed=7, row_count=10, overrides={}),
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertEqual(payload["scenario_name"], "order_benchmark")
+        self.assertEqual(payload["row_count"], 10)
+        self.assertIn("customer_id", payload["fields"])
+        self.assertIn("product_id", payload["fields"])
+        self.assertIn("order_amount", payload["fields"])
 
     def test_handler_routes_scenario_generate(self):
         event = {
