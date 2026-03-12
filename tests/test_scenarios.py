@@ -1133,6 +1133,7 @@ class ScenarioEngineTest(unittest.TestCase):
     def test_handler_returns_json_error_for_invalid_body(self):
         event = {
             "rawPath": "/v1/scenarios/generate",
+            "httpMethod": "POST",
             "body": '{"name":"bad_json"',
         }
 
@@ -1173,6 +1174,31 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(payload["scenario_name"], "iot_sensor_benchmark")
         self.assertEqual(len(payload["rows"]), 8)
+
+    def test_handler_allows_get_health_for_http_requests(self):
+        event = {
+            "rawPath": "/health",
+            "httpMethod": "GET",
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(payload["status"], "ok")
+
+    def test_handler_rejects_wrong_http_method(self):
+        event = {
+            "rawPath": "/v1/distributions/generate",
+            "httpMethod": "GET",
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 405)
+        self.assertEqual(payload["error"], "method_not_allowed")
+        self.assertEqual(response["headers"]["Allow"], "POST")
 
 
 if __name__ == "__main__":
