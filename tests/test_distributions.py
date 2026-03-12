@@ -57,6 +57,39 @@ class DistributionEngineTest(unittest.TestCase):
         self.assertIn("sample", payload)
         self.assertNotIn("samples", payload)
 
+    def test_distribution_generate_rejects_invalid_probability(self):
+        request = DistributionGenerateRequest(
+            distribution="bernoulli",
+            parameters={"probability": 1.5},
+            count=3,
+            seed=42,
+        )
+
+        with self.assertRaisesRegex(ValueError, "bernoulli.probability must be between 0.0 and 1.0 inclusive"):
+            build_distribution_generate_response(request)
+
+    def test_distribution_generate_rejects_invalid_uniform_bounds(self):
+        request = DistributionGenerateRequest(
+            distribution="uniform",
+            parameters={"low": 4.0, "high": 4.0},
+            count=3,
+            seed=42,
+        )
+
+        with self.assertRaisesRegex(ValueError, "uniform.high must be greater than uniform.low"):
+            build_distribution_generate_response(request)
+
+    def test_distribution_generate_rejects_invalid_categorical_weights(self):
+        request = DistributionGenerateRequest(
+            distribution="categorical",
+            parameters={"values": ["a", "b"], "weights": [1.0]},
+            count=3,
+            seed=42,
+        )
+
+        with self.assertRaisesRegex(ValueError, "categorical weights must match the number of values"):
+            build_distribution_generate_response(request)
+
 
 if __name__ == "__main__":
     unittest.main()

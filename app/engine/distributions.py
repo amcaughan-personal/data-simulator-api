@@ -19,6 +19,17 @@ DEFAULT_DISTRIBUTION_PARAMETERS: dict[str, dict[str, float]] = {
 }
 
 
+SUPPORTED_DISTRIBUTION_PARAMETERS: dict[str, tuple[str, ...]] = {
+    "bernoulli": ("probability",),
+    "categorical": ("values", "weights"),
+    "exponential": ("rate",),
+    "lognormal": ("mean", "stddev"),
+    "normal": ("mean", "stddev"),
+    "poisson": ("rate",),
+    "uniform": ("low", "high"),
+}
+
+
 def resolve_distribution_parameter(distribution: str, parameters: dict[str, Any], parameter: str) -> float:
     if parameter in parameters:
         return float(parameters[parameter])
@@ -27,7 +38,11 @@ def resolve_distribution_parameter(distribution: str, parameters: dict[str, Any]
     if parameter in defaults:
         return defaults[parameter]
 
-    raise ValueError(f"unsupported parameter {parameter} for distribution {distribution}")
+    supported_parameters = ", ".join(SUPPORTED_DISTRIBUTION_PARAMETERS.get(distribution, ()))
+    raise ValueError(
+        f"unsupported parameter {parameter!r} for distribution {distribution!r}; "
+        f"supported parameters: {supported_parameters}"
+    )
 
 
 def _normalize_weights(values: Sequence[Any], weights: Sequence[float] | None) -> np.ndarray | None:
@@ -35,14 +50,32 @@ def _normalize_weights(values: Sequence[Any], weights: Sequence[float] | None) -
         return None
 
     if len(values) != len(weights):
-        raise ValueError("weights must match the number of categorical values")
+        raise ValueError(
+            "categorical weights must match the number of values; "
+            f"got {len(weights)} weights for {len(values)} values"
+        )
 
     weights_array = np.asarray(weights, dtype=float)
     total = weights_array.sum()
     if total <= 0:
-        raise ValueError("categorical weights must sum to a positive value")
+        raise ValueError(f"categorical weights must sum to a positive value; got sum={total}")
 
     return weights_array / total
+
+
+def _require_non_negative(name: str, value: float) -> None:
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0; got {value}")
+
+
+def _require_positive(name: str, value: float) -> None:
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0; got {value}")
+
+
+def _require_probability(name: str, value: float) -> None:
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"{name} must be between 0.0 and 1.0 inclusive; got {value}")
 
 
 def sample_distribution(
@@ -56,40 +89,50 @@ def sample_distribution(
     if distribution == "normal":
         mean = float(parameters.get("mean", 0.0))
         stddev = float(parameters.get("stddev", 1.0))
+        _require_non_negative("normal.stddev", stddev)
         return rng.normal(loc=mean, scale=stddev, size=count).tolist()
 
     if distribution == "uniform":
         low = float(parameters.get("low", 0.0))
         high = float(parameters.get("high", 1.0))
+        if high <= low:
+            raise ValueError(f"uniform.high must be greater than uniform.low; got low={low}, high={high}")
         return rng.uniform(low=low, high=high, size=count).tolist()
 
     if distribution == "lognormal":
         mean = float(parameters.get("mean", 0.0))
         stddev = float(parameters.get("stddev", 1.0))
+        _require_non_negative("lognormal.stddev", stddev)
         return rng.lognormal(mean=mean, sigma=stddev, size=count).tolist()
 
     if distribution == "exponential":
         rate = float(parameters.get("rate", 1.0))
+        _require_positive("exponential.rate", rate)
         scale = 1.0 / rate
         return rng.exponential(scale=scale, size=count).tolist()
 
     if distribution == "poisson":
         rate = float(parameters.get("rate", 1.0))
+        _require_non_negative("poisson.rate", rate)
         return rng.poisson(lam=rate, size=count).tolist()
 
     if distribution == "bernoulli":
         probability = float(parameters.get("probability", 0.5))
+        _require_probability("bernoulli.probability", probability)
         return rng.binomial(n=1, p=probability, size=count).tolist()
 
     if distribution == "categorical":
         values = parameters.get("values")
         if not values:
-            raise ValueError("categorical distributions require a non-empty values list")
+            raise ValueError("categorical distributions require a non-empty values list in parameters.values")
 
         weights = _normalize_weights(values, parameters.get("weights"))
         return rng.choice(values, size=count, p=weights).tolist()
 
-    raise ValueError(f"unsupported distribution: {distribution}")
+    supported_distributions = ", ".join(sorted(DEFAULT_DISTRIBUTION_PARAMETERS))
+    raise ValueError(
+        f"unsupported distribution {distribution!r}; supported distributions: {supported_distributions}"
+    )
 
 
 def summarize_samples(samples: Sequence[Any]) -> dict[str, Any]:
