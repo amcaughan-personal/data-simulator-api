@@ -70,9 +70,6 @@ scenario_sample_output="$(invoke_lambda "scenario_sample" '{
   "action": "/v1/scenarios/sample",
   "name": "smoke_sample",
   "seed": 11,
-  "time": {
-    "frequency_seconds": 60
-  },
   "fields": [
     {
       "name": "value",
@@ -86,9 +83,9 @@ scenario_sample_output="$(invoke_lambda "scenario_sample" '{
       }
     }
   ],
-  "injectors": [
+  "mutations": [
     {
-      "injector_id": "always_scale",
+      "mutation_id": "always_scale",
       "field": "value",
       "selection": {
         "kind": "rate",
