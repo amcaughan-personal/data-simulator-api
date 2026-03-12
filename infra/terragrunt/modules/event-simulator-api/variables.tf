@@ -55,19 +55,8 @@ variable "timeout_seconds" {
   default = 5
 }
 
-variable "private_api_enabled" {
-  type    = bool
-  default = false
-}
-
 variable "private_api_allowed_vpc_ssm_param_name" {
-  type    = string
-  default = null
-
-  validation {
-    condition     = !var.private_api_enabled || var.private_api_allowed_vpc_ssm_param_name != null
-    error_message = "private_api_allowed_vpc_ssm_param_name must be set when private_api_enabled is true."
-  }
+  type = string
 }
 
 variable "private_api_dns_name" {

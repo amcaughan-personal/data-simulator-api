@@ -1,13 +1,11 @@
 data "aws_region" "current" {}
 
 data "aws_ssm_parameter" "private_api_allowed_vpc" {
-  count = var.private_api_enabled ? 1 : 0
-
   name = var.private_api_allowed_vpc_ssm_param_name
 }
 
 data "aws_ssm_parameter" "private_api_dns_zone_id" {
-  count = var.private_api_enabled && var.private_api_dns_name != null ? 1 : 0
+  count = var.private_api_dns_name != null ? 1 : 0
 
   name = var.private_api_dns_zone_id_ssm_param_name
 }
@@ -17,8 +15,6 @@ locals {
 }
 
 data "aws_iam_policy_document" "private_api_policy" {
-  count = var.private_api_enabled ? 1 : 0
-
   statement {
     sid    = "AllowPrivateInvokeFromSharedVpc"
     effect = "Allow"
@@ -34,24 +30,20 @@ data "aws_iam_policy_document" "private_api_policy" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceVpc"
-      values   = [data.aws_ssm_parameter.private_api_allowed_vpc[0].value]
+      values   = [data.aws_ssm_parameter.private_api_allowed_vpc.value]
     }
   }
 }
 
 resource "aws_cloudwatch_log_group" "private_api_access" {
-  count = var.private_api_enabled ? 1 : 0
-
   name              = "/aws/apigateway/${var.function_name}-private"
   retention_in_days = var.private_api_log_retention_in_days
 }
 
 resource "aws_api_gateway_rest_api" "private" {
-  count = var.private_api_enabled ? 1 : 0
-
   name        = "${var.function_name}-private"
   description = "Private REST API for ${var.function_name}"
-  policy      = data.aws_iam_policy_document.private_api_policy[0].json
+  policy      = data.aws_iam_policy_document.private_api_policy.json
 
   endpoint_configuration {
     types = ["PRIVATE"]
@@ -59,18 +51,14 @@ resource "aws_api_gateway_rest_api" "private" {
 }
 
 resource "aws_api_gateway_resource" "proxy" {
-  count = var.private_api_enabled ? 1 : 0
-
-  rest_api_id = aws_api_gateway_rest_api.private[0].id
-  parent_id   = aws_api_gateway_rest_api.private[0].root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_rest_api.private.root_resource_id
   path_part   = "{proxy+}"
 }
 
 resource "aws_api_gateway_method" "proxy_any" {
-  count = var.private_api_enabled ? 1 : 0
-
-  rest_api_id   = aws_api_gateway_rest_api.private[0].id
-  resource_id   = aws_api_gateway_resource.proxy[0].id
+  rest_api_id   = aws_api_gateway_rest_api.private.id
+  resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
   authorization = "NONE"
 
@@ -80,26 +68,22 @@ resource "aws_api_gateway_method" "proxy_any" {
 }
 
 resource "aws_api_gateway_integration" "proxy_any" {
-  count = var.private_api_enabled ? 1 : 0
-
-  rest_api_id             = aws_api_gateway_rest_api.private[0].id
-  resource_id             = aws_api_gateway_resource.proxy[0].id
-  http_method             = aws_api_gateway_method.proxy_any[0].http_method
+  rest_api_id             = aws_api_gateway_rest_api.private.id
+  resource_id             = aws_api_gateway_resource.proxy.id
+  http_method             = aws_api_gateway_method.proxy_any.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.this.invoke_arn
 }
 
 resource "aws_api_gateway_deployment" "private" {
-  count = var.private_api_enabled ? 1 : 0
-
-  rest_api_id = aws_api_gateway_rest_api.private[0].id
+  rest_api_id = aws_api_gateway_rest_api.private.id
 
   triggers = {
     redeployment = sha1(jsonencode({
-      proxy_integration = aws_api_gateway_integration.proxy_any[0].id
-      proxy_method      = aws_api_gateway_method.proxy_any[0].id
-      proxy_resource    = aws_api_gateway_resource.proxy[0].id
+      proxy_integration = aws_api_gateway_integration.proxy_any.id
+      proxy_method      = aws_api_gateway_method.proxy_any.id
+      proxy_resource    = aws_api_gateway_resource.proxy.id
     }))
   }
 
@@ -109,14 +93,12 @@ resource "aws_api_gateway_deployment" "private" {
 }
 
 resource "aws_api_gateway_stage" "private" {
-  count = var.private_api_enabled ? 1 : 0
-
-  rest_api_id   = aws_api_gateway_rest_api.private[0].id
-  deployment_id = aws_api_gateway_deployment.private[0].id
+  rest_api_id   = aws_api_gateway_rest_api.private.id
+  deployment_id = aws_api_gateway_deployment.private.id
   stage_name    = local.private_api_stage_name
 
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.private_api_access[0].arn
+    destination_arn = aws_cloudwatch_log_group.private_api_access.arn
     format = jsonencode({
       requestId              = "$context.requestId"
       sourceIp               = "$context.identity.sourceIp"
@@ -137,23 +119,21 @@ resource "aws_api_gateway_stage" "private" {
 }
 
 resource "aws_route53_record" "private_api_cname" {
-  count = var.private_api_enabled && var.private_api_dns_name != null ? 1 : 0
+  count = var.private_api_dns_name != null ? 1 : 0
 
   zone_id = data.aws_ssm_parameter.private_api_dns_zone_id[0].value
   name    = var.private_api_dns_name
   type    = "CNAME"
   ttl     = 60
   records = [
-    "${aws_api_gateway_rest_api.private[0].id}.execute-api.${data.aws_region.current.region}.amazonaws.com",
+    "${aws_api_gateway_rest_api.private.id}.execute-api.${data.aws_region.current.region}.amazonaws.com",
   ]
 }
 
 resource "aws_lambda_permission" "private_api_gateway" {
-  count = var.private_api_enabled ? 1 : 0
-
   statement_id  = "AllowPrivateApiGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.this.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.private[0].execution_arn}/*/*"
+  source_arn    = "${aws_api_gateway_rest_api.private.execution_arn}/*/*"
 }

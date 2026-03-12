@@ -16,7 +16,6 @@ inputs = {
   private_api_allowed_vpc_ssm_param_name = "/network/dev/vpc/vpc_id"
   private_api_dns_name                    = "simulator-api.dev.internal"
   private_api_dns_zone_id_ssm_param_name  = "/network/dev/endpoints/private_dns_zone_id"
-  private_api_enabled                    = true
   private_api_stage_name                 = "dev"
   reserved_concurrent_executions   = 1
   timeout_seconds                  = 5

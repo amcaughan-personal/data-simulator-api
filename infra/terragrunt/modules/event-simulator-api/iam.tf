@@ -30,8 +30,6 @@ resource "aws_iam_role" "lambda" {
 }
 
 resource "aws_iam_role" "api_gateway_cloudwatch" {
-  count = var.private_api_enabled ? 1 : 0
-
   name               = "${var.function_name}-apigw-cloudwatch"
   assume_role_policy = data.aws_iam_policy_document.api_gateway_assume_role.json
 }
@@ -42,16 +40,12 @@ resource "aws_iam_role_policy_attachment" "basic_execution" {
 }
 
 resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
-  count = var.private_api_enabled ? 1 : 0
-
-  role       = aws_iam_role.api_gateway_cloudwatch[0].name
+  role       = aws_iam_role.api_gateway_cloudwatch.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 }
 
 resource "aws_api_gateway_account" "this" {
-  count = var.private_api_enabled ? 1 : 0
-
-  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch[0].arn
+  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch.arn
 }
 
 data "aws_iam_policy_document" "lambda_dlq" {
