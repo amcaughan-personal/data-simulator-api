@@ -7,9 +7,17 @@ terraform {
 }
 
 inputs = {
-  app_dir                                = "${get_repo_root()}/app"
-  description                            = "Development Lambda for the data simulator API"
-  environment                            = "dev"
+  app_dir     = "${get_repo_root()}/app"
+  description = "Development Lambda for the data simulator API"
+  environment = "dev"
+  extra_default_tags = {
+    # Weekly cleanup keeps this sandbox affordable. In a real production system,
+    # these resources would usually stay up until intentionally retired.
+    auto_cleanup     = "true"
+    cleanup_schedule = "weekly"
+    # Intentional here: the janitor treats apply time as "last touched" time.
+    created_on = run_cmd("date", "-u", "+%Y-%m-%d")
+  }
   function_name                          = "data-simulator-api-dev"
   log_retention_in_days                  = 14
   memory_size_mb                         = 256
