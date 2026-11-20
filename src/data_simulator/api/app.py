@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
@@ -54,6 +55,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # be valid JSON, e.g. NaN).
         errors = [{"loc": e["loc"], "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
         return JSONResponse({"detail": errors}, status_code=422)
+
+    # Specs are a few KB; anything this big is a mistake or abuse. (The CloudFront Free
+    # plan can't enforce body size in WAF, so the app does.)
+    max_body_bytes = 64 * 1024
+
+    @app.middleware("http")
+    async def limit_body_size(request: Request, call_next):
+        declared = request.headers.get("content-length")
+        too_big = int(declared) > max_body_bytes if declared and declared.isdigit() else False
+        if not too_big and request.method in ("POST", "PUT", "PATCH"):
+            too_big = len(await request.body()) > max_body_bytes
+        if too_big:
+            return JSONResponse({"detail": f"Request body over {max_body_bytes} bytes"}, status_code=413)
+        return await call_next(request)
+
+    # Lets web pages call the API from any site; it's public and uses no cookies.
+    app.add_middleware(
+        CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"], max_age=600
+    )
 
     if settings.origin_secret:
 
