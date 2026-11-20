@@ -6,6 +6,7 @@ import hmac
 from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
@@ -46,6 +47,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description=DESCRIPTION,
         root_path=settings.root_path,
     )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # Say where and why, without echoing the submitted value back (which may not even
+        # be valid JSON, e.g. NaN).
+        errors = [{"loc": e["loc"], "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
+        return JSONResponse({"detail": errors}, status_code=422)
 
     if settings.origin_secret:
 

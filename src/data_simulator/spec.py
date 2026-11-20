@@ -27,7 +27,10 @@ DEFAULT_START = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(extra="forbid", validate_default=True, populate_by_name=True)
+    # allow_inf_nan=False: Python's JSON parser accepts NaN and Infinity; reject them.
+    model_config = ConfigDict(
+        extra="forbid", validate_default=True, populate_by_name=True, allow_inf_nan=False
+    )
 
 
 def _exactly_one(model: BaseModel, keys: tuple[str, ...], what: str) -> str:

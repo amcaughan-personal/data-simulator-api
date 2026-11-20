@@ -53,6 +53,19 @@ def test_bad_requests_return_422_with_a_reason(client):
     assert too_big.status_code == 422 and "the limit is 10,000" in too_big.text
 
 
+def test_non_finite_numbers_are_rejected(client):
+    nan_input = '{"rows": {"count": 2}, "common_columns": {"x": {"normal": {"mean": NaN}}}}'
+    response = client.post("/v1/datasets", content=nan_input, headers={"Content-Type": "application/json"})
+    assert response.status_code == 422
+
+    runaway = {
+        "rows": {"every": "1d", "count": 400},
+        "common_columns": {"x": {"constant": 1e300, "trend": {"growth": 10}}},
+    }
+    response = client.post("/v1/datasets", json=runaway)
+    assert response.status_code == 422 and "overflowed" in response.text
+
+
 def test_origin_secret_required_when_configured():
     guarded = TestClient(create_app(Settings(max_cells=10_000, root_path="", origin_secret="s3cret")))
     assert guarded.get("/health").status_code == 403

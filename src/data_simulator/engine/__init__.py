@@ -45,6 +45,11 @@ def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
 
     for name in spec.column_order:
         frame.columns[name] = _generate_column(name, spec, frame)
+        values = frame.columns[name]
+        if values.dtype != object and np.isinf(values).any():
+            raise GenerationError(
+                f"{name}: values overflowed to infinity; use smaller numbers or a gentler trend"
+            )
 
     if frame.anomaly_labels is not None:
         frame.columns[spec.anomaly_column] = frame.anomaly_labels
