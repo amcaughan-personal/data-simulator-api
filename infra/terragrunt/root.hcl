@@ -2,10 +2,13 @@ locals {
   aws_region  = "us-east-2"
   aws_profile = "default"
 
+  # On every taggable resource, so anything in the console points back to the code
+  # that manages it: the repo, and the Terragrunt stack within it.
   common_tags = {
-    Project   = "data-simulator-api"
-    Owner     = "amcaughan"
+    Repo      = "amcaughan-personal/data-simulator-api"
+    Stack     = path_relative_to_include() # e.g. live/dev/api
     ManagedBy = "terragrunt"
+    Owner     = "amcaughan"
   }
 }
 
