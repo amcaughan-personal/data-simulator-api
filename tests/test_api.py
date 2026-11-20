@@ -8,7 +8,7 @@ from data_simulator.settings import Settings
 
 @pytest.fixture
 def client():
-    return TestClient(create_app(Settings(max_rows=500, root_path="")))
+    return TestClient(create_app(Settings(max_cells=10_000, root_path="")))
 
 
 @pytest.mark.parametrize("name", list(DATASET_EXAMPLES))
@@ -23,8 +23,8 @@ def test_bad_requests_return_422_with_a_reason(client):
     invalid = client.post("/v1/datasets", json={"rows": {"one_each": True}, "common_columns": columns})
     assert invalid.status_code == 422 and "needs every profile to have a count" in invalid.text
 
-    too_big = client.post("/v1/datasets", json={"rows": {"count": 501}, "common_columns": columns})
-    assert too_big.status_code == 422 and "limit is 500" in too_big.text
+    too_big = client.post("/v1/datasets", json={"rows": {"count": 10_001}, "common_columns": columns})
+    assert too_big.status_code == 422 and "the limit is 10,000" in too_big.text
 
 
 def test_lambda_handler_serves_api_gateway_events():

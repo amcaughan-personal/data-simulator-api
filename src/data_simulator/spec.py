@@ -15,6 +15,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from data_simulator.durations import Duration
 
 Name = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=64)]
+Text = Annotated[str, Field(max_length=100)]
+
+# Size limits. With the cell limit applied at request time, these keep every response small.
+MAX_COLUMNS = 100
+MAX_PROFILES = 50
+MAX_INDIVIDUALS = 50_000
+MAX_CATEGORIES = 1_000
 
 DEFAULT_START = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -156,9 +163,13 @@ class ColumnSpec(_Model):
     uniform: UniformParams | None = None
     exponential: MeanParams | None = None
     poisson: MeanParams | None = None
-    constant: str | int | float | bool | None = None
+    constant: Text | int | float | bool | None = None
     sequence: SequenceParams | None = None
-    categorical: list[str] | dict[str, float] | None = Field(
+    categorical: (
+        Annotated[list[Text], Field(max_length=MAX_CATEGORIES)]
+        | Annotated[dict[Text, float], Field(max_length=MAX_CATEGORIES)]
+        | None
+    ) = Field(
         None,
         description="A list (equally likely) or probabilities adding up to 1: {'west': 0.75, 'east': 0.25}.",
     )
@@ -167,7 +178,9 @@ class ColumnSpec(_Model):
     # Adjustments.
     per: Name | None = Field(None, description="Fix the value per individual, e.g. 'id'.")
     trend: Trend | None = Field(None, description="Needs rows with timestamps.")
-    seasonality: list[Cycle] = Field(default_factory=list, description="Needs rows with timestamps.")
+    seasonality: list[Cycle] = Field(
+        default_factory=list, max_length=10, description="Needs rows with timestamps."
+    )
     multiply_column: Dependency | None = Field(
         None, description="An earlier numeric column, or a category lookup."
     )
@@ -313,7 +326,7 @@ class DatasetSpec(_Model):
     description: str | None = Field(None, max_length=500)
     seed: int | None = Field(None, ge=0, description="Same seed, same data. Omit for a random seed.")
     rows: RowsSpec
-    profiles: dict[Name, Profile] = Field(default_factory=dict)
+    profiles: dict[Name, Profile] = Field(default_factory=dict, max_length=MAX_PROFILES)
     common_columns: dict[Name, ColumnSpec] = Field(default_factory=dict)
     profile_column: Name = "profile"
     id_column: Name = "id"
@@ -323,6 +336,13 @@ class DatasetSpec(_Model):
         self._check_profiles()
         if not self.column_order:
             raise ValueError("define at least one column in common_columns or profiles")
+        if len(self.column_order) > MAX_COLUMNS:
+            raise ValueError(f"{len(self.column_order)} columns defined; the limit is {MAX_COLUMNS}")
+        individuals = sum(profile.count or 0 for profile in self.profiles.values())
+        if individuals > MAX_INDIVIDUALS:
+            raise ValueError(
+                f"profiles have {individuals} individuals in total; the limit is {MAX_INDIVIDUALS}"
+            )
 
         if self.rows.one_each and not self.has_ids:
             raise ValueError("rows.one_each needs every profile to have a count")
@@ -393,6 +413,10 @@ class DatasetSpec(_Model):
         if name in self.common_columns:
             return [self.common_columns[name]]
         return [profile.columns[name] for profile in self.profiles.values()]
+
+    @property
+    def column_count(self) -> int:
+        return len(self.generated_columns) + len(self.column_order)
 
     @property
     def row_count(self) -> int:

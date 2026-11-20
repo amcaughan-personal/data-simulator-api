@@ -66,6 +66,11 @@ def test_row_shapes(rows, expected):
             {"rows": {"count": 5}, "common_columns": {"x": {"normal": {}, "add_column": "x"}}},
             "earlier column",
         ),
+        (
+            {"rows": {"count": 5}, "common_columns": {f"c{i}": {"normal": {}} for i in range(101)}},
+            "limit is 100",
+        ),
+        ({"rows": {"count": 5}, "common_columns": {"x": {"constant": "x" * 101}}}, "at most 100 characters"),
     ],
 )
 def test_invalid_specs_explain_the_problem(raw, message):

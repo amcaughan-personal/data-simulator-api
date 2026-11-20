@@ -55,7 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/v1/datasets", tags=["datasets"], summary="Generate a dataset from a spec")
     def create_dataset(spec: Annotated[DatasetSpec, Body(openapi_examples=DATASET_EXAMPLES)]) -> Dataset:
         try:
-            return Dataset(**generate(spec, max_rows=settings.max_rows))
+            return Dataset(**generate(spec, max_cells=settings.max_cells))
         except GenerationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
