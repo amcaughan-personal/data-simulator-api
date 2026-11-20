@@ -22,9 +22,13 @@ from data_simulator.spec import ColumnSpec, DatasetSpec
 __all__ = ["GenerationError", "generate"]
 
 
-def generate(spec: DatasetSpec, max_rows: int | None = None) -> dict[str, Any]:
-    if max_rows is not None and spec.row_count > max_rows:
-        raise GenerationError(f"spec would produce {spec.row_count} rows; the limit is {max_rows}")
+def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
+    cells = spec.row_count * spec.column_count
+    if max_cells is not None and cells > max_cells:
+        raise GenerationError(
+            f"spec would produce {cells:,} cells ({spec.row_count:,} rows x {spec.column_count} columns); "
+            f"the limit is {max_cells:,}"
+        )
 
     seed = spec.seed if spec.seed is not None else new_seed()
     frame = layout_rows(spec, seed)

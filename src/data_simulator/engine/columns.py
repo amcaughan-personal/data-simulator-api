@@ -124,6 +124,19 @@ def _dependency(dependency: Dependency, frame: Frame, rows: np.ndarray, neutral:
     return result
 
 
+def _cumsum_per_series(steps: np.ndarray, series: np.ndarray) -> np.ndarray:
+    """Running total of `steps` within each series, keeping row order inside a series."""
+    order = np.argsort(series, kind="stable")
+    sorted_steps, sorted_series = steps[order], series[order]
+    running = np.cumsum(sorted_steps)
+    starts = np.flatnonzero(np.r_[True, sorted_series[1:] != sorted_series[:-1]])
+    lengths = np.diff(np.r_[starts, len(steps)])
+    before_each_series = np.repeat(running[starts] - sorted_steps[starts], lengths)
+    walk = np.empty_like(steps)
+    walk[order] = running - before_each_series
+    return walk
+
+
 def _add_noise(
     values: np.ndarray, spec: ColumnSpec, series: np.ndarray, rng: np.random.Generator
 ) -> np.ndarray:
@@ -135,9 +148,5 @@ def _add_noise(
         return values + rng.uniform(-half, half, len(values))
     if noise.random_walk is not None:
         steps = rng.normal(0.0, noise.random_walk.step, len(values))
-        walk = np.empty_like(values)
-        for one_series in np.unique(series):
-            members = np.flatnonzero(series == one_series)
-            walk[members] = np.cumsum(steps[members])
-        return values + walk
+        return values + _cumsum_per_series(steps, series)
     return rng.poisson(np.clip(values, 0, None)).astype(float)

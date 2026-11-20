@@ -8,14 +8,15 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Settings:
-    max_rows: int
+    max_cells: int
     root_path: str
 
 
 def load_settings() -> Settings:
     return Settings(
-        # Caps response size, and with it compute time and data transfer per request.
-        max_rows=int(os.environ.get("DATA_SIMULATOR_MAX_ROWS", "5000")),
+        # Rows x columns per response. 100,000 cells is roughly 3 MB of JSON, well under
+        # Lambda's 6 MB response limit; it also bounds compute and data transfer per request.
+        max_cells=int(os.environ.get("DATA_SIMULATOR_MAX_CELLS", "100000")),
         # Path prefix when served behind an API Gateway stage, so /docs links resolve.
         root_path=os.environ.get("DATA_SIMULATOR_ROOT_PATH", ""),
     )

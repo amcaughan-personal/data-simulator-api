@@ -95,6 +95,20 @@ Optional adjustments, applied in this order:
 
 `multiply_column` and `add_column` can only reference columns listed earlier (common columns come first), so reference loops are impossible.
 
+## Limits
+
+Every response is kept small, so a tiny request can't ask for a huge table:
+
+| Limit | Value |
+|---|---|
+| Cells per response (rows × columns) | 100,000 (about 3 MB of JSON) |
+| Columns | 100 |
+| Profiles | 50 |
+| Individuals across all profiles | 50,000 |
+| Text values (constants, categories) | 100 characters; 1,000 categories |
+
+Requests over a limit get a `422` saying which limit was hit.
+
 ## Run it locally
 
 ```bash
