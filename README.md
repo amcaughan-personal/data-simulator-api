@@ -16,7 +16,7 @@ curl -X POST https://d1dfbd1pkurhz5.cloudfront.net/v1/datasets \
  "rows": [{"region": "south", "orders": 5}, {"region": "north", "orders": 4}, {"region": "north", "orders": 3}]}
 ```
 
-Need a feed rather than a one-off table? `POST /v1/streams/window` treats a spec as an endless stream: fetch any time window, and consecutive windows join up exactly, so ELT jobs and dbt models can pull it hour by hour.
+Just need rows to test a pipeline? `GET /v1/datasets/simple?rows=100&columns=5` returns plain data of that shape. Need a feed rather than a one-off table? `POST /v1/streams/window` treats a spec as an endless stream: fetch any time window, and consecutive windows join up exactly, so ELT jobs and dbt models can pull it hour by hour.
 
 Datasets can mix several kinds of things (standard and premium cards, indoor and outdoor sensors), follow trends and daily or weekly cycles, include labelled anomalies, and come back as JSON or CSV. The same spec and seed always give the same data.
 

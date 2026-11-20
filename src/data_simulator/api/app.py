@@ -5,7 +5,7 @@ from __future__ import annotations
 import hmac
 from typing import Annotated, Any
 
-from fastapi import Body, FastAPI, Header, HTTPException, Request
+from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
@@ -15,6 +15,7 @@ from data_simulator.api.csv_output import to_csv, wants_csv
 from data_simulator.api.examples import DATASET_EXAMPLES, STREAM_EXAMPLES
 from data_simulator.engine import GenerationError, generate, generate_window
 from data_simulator.settings import Settings, load_settings
+from data_simulator.simple import simple_spec
 from data_simulator.spec import DatasetSpec, StreamWindowRequest
 
 DESCRIPTION = """
@@ -31,6 +32,8 @@ Two endpoints:
 - `POST /v1/datasets` returns one complete dataset.
 - `POST /v1/streams/window` returns one time window of an endless stream. Every window
   is consistent with every other, so a pipeline can fetch hour after hour.
+- `GET /v1/datasets/simple?rows=100&columns=5` returns plain data of that shape, for
+  testing a pipeline without designing a data model.
 
 Open either, choose an example and press *Try it out*.
 Send `Accept: text/csv` to get CSV instead of JSON.
@@ -117,6 +120,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> Dataset:
         try:
             dataset = generate(spec, max_cells=settings.max_cells)
+        except GenerationError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return _csv_response(dataset) if wants_csv(accept) else Dataset(**dataset)
+
+    @app.get(
+        "/v1/datasets/simple",
+        tags=["datasets"],
+        summary="Plain data of a given shape",
+        responses={
+            200: {"content": {"text/csv": {}}, "description": "JSON by default; CSV with Accept: text/csv"}
+        },
+    )
+    def simple_dataset(
+        rows: Annotated[int, Query(ge=1, le=100_000)] = 100,
+        columns: Annotated[int, Query(ge=1, le=100, description="Including the id column.")] = 5,
+        seed: Annotated[int | None, Query(ge=0)] = None,
+        accept: Annotated[str, Header()] = "application/json",
+    ) -> Dataset:
+        """`id`, then columns cycling through a decimal, a whole number and a category."""
+        try:
+            dataset = generate(simple_spec(rows, columns, seed), max_cells=settings.max_cells)
         except GenerationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return _csv_response(dataset) if wants_csv(accept) else Dataset(**dataset)

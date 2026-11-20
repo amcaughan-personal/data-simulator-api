@@ -55,6 +55,8 @@ Why the API is built the way it is, and what each choice gives up.
 
 **Decision:** both endpoints are `POST`, although they only read: nothing is stored, and the same request gives the same response.
 
+The exception is `GET /v1/datasets/simple`, whose input is just a few numbers.
+
 **Why:** the spec is structured JSON of up to 64 KB. `GET` has no standard request body (CloudFront and many clients drop it), and squeezing specs into query strings would be unreadable and hit URL length limits. This is the usual choice for query-style APIs (Elasticsearch's search, GraphQL).
 
 ## Validate everything up front; never execute input

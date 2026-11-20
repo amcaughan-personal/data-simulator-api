@@ -123,3 +123,12 @@ def test_stream_examples_work(client, name):
         "/v1/streams/window", json=STREAM_EXAMPLES[name]["value"], headers={"Accept": "text/csv"}
     )
     assert csv.headers["x-row-count"] == str(body["row_count"])
+
+
+def test_simple_dataset_has_the_requested_shape(client):
+    body = client.get("/v1/datasets/simple", params={"rows": 7, "columns": 5, "seed": 1}).json()
+    assert body["columns"] == ["id", "number_1", "count_1", "category_1", "number_2"]
+    assert body["row_count"] == len(body["rows"]) == 7
+    assert [row["id"] for row in body["rows"]] == list(range(1, 8))
+
+    assert client.get("/v1/datasets/simple", params={"rows": 5000, "columns": 5}).status_code == 422
