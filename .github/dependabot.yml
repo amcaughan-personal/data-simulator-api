@@ -1,0 +1,32 @@
+# Weekly update PRs, only for versions published at least 7 days ago (a new release has
+# time to be pulled or flagged before it lands here). Security fixes skip the wait.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      # Shared workflows are pinned to a main commit and bumped on purpose.
+      - dependency-name: "amcaughan-personal/*"
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directories:
+      - /local-dev/docker
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
