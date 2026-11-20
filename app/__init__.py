@@ -1,1 +1,0 @@
-"""Data simulator application package."""

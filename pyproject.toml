@@ -1,0 +1,43 @@
+[project]
+name = "data-simulator"
+version = "0.1.0"
+description = "Generate realistic synthetic datasets from a small JSON spec."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "mangum>=0.19,<1",
+    "numpy>=2.2,<3",
+    "pydantic>=2.11,<3",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.0",
+    "pytest>=8.3",
+    "ruff>=0.11",
+    "uvicorn>=0.34",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/data_simulator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # Mangum calls asyncio.get_event_loop(); harmless, fixed upstream in a later release.
+    "ignore:There is no current event loop:DeprecationWarning:mangum",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
