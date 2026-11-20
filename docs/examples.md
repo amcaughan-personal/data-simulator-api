@@ -26,7 +26,7 @@ Card transactions from two kinds of card. Premium cards spend more and are decli
       "count": 32,
       "columns": {
         "amount":   {"lognormal": {"median": 35, "sigma": 0.8}, "round": 2},
-        "items":    {"poisson": {"mean": 2}},
+        "items":    {"poisson": {"mean": 2}, "min": 1},
         "declined": {"bernoulli": 0.03}
       }
     },
@@ -34,7 +34,7 @@ Card transactions from two kinds of card. Premium cards spend more and are decli
       "count": 8,
       "columns": {
         "amount":   {"lognormal": {"median": 60, "sigma": 0.6}, "round": 2},
-        "items":    {"poisson": {"mean": 4}},
+        "items":    {"poisson": {"mean": 4}, "min": 1},
         "declined": {"bernoulli": 0.01}
       }
     }
