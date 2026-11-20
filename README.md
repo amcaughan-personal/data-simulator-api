@@ -92,8 +92,22 @@ Optional adjustments, applied in this order:
 | `"noise": {"normal": {"stddev": 5}}` | also `uniform`, `random_walk`, or `{"poisson": true}` for counts |
 | `"min"`, `"max"`, `"round"` | clip and round |
 | `"missing": 0.05` | leave 5% of values empty |
+| `"anomalies": [{"name": "spike", "multiply": 3, "chance": 0.01}]` | something unusual on some rows (see below) |
 
 `multiply_column` and `add_column` can only reference columns listed earlier (common columns come first), so reference loops are impossible.
+
+### Anomalies
+
+An anomaly changes some values (`multiply`, `add`, or `set`, where `null` empties the value) on rows picked by `chance`, by a time window (`between`), or both. Each affected row records the anomaly's name in an `anomaly` column, so the data comes with ground truth for analysis or model training:
+
+```json
+"anomalies": [
+  {"name": "sensor_dead", "set": null, "chance": 0.03},
+  {"name": "heatwave", "add": 8, "between": ["2026-01-01T12:00:00Z", "2026-01-01T17:00:00Z"]}
+]
+```
+
+Anomalies apply to rows, not to individuals. For whole kinds of unusual things (say, fraudulent cards), use a rare profile instead.
 
 ## Limits
 
@@ -133,7 +147,7 @@ infra/                 Terraform/Terragrunt for AWS (being reworked)
 
 ## Status
 
-Being rebuilt in small steps. Next: anomalies with labels, CSV output, then a public deployment with cost controls.
+Being rebuilt in small steps. Next: CSV output, then a public deployment with cost controls.
 
 ## License
 

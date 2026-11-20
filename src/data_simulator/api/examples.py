@@ -76,7 +76,10 @@ INSTITUTIONS: dict[str, Any] = {
 
 SENSOR_FLEET: dict[str, Any] = {
     "name": "sensor_fleet",
-    "description": "Hourly readings from indoor and outdoor sensors. Each sensor reads a bit high or low.",
+    "description": (
+        "Hourly readings from indoor and outdoor sensors. Each sensor reads a bit high or low; "
+        "indoor sensors sometimes go dead, and outdoor ones see an afternoon heatwave."
+    ),
     "seed": 3,
     "profiles": {
         "indoor": {
@@ -87,6 +90,7 @@ SENSOR_FLEET: dict[str, Any] = {
                     "add_column": "calibration_offset",
                     "noise": {"random_walk": {"step": 0.1}},
                     "round": 2,
+                    "anomalies": [{"name": "sensor_dead", "set": None, "chance": 0.03}],
                 }
             },
         },
@@ -99,7 +103,13 @@ SENSOR_FLEET: dict[str, Any] = {
                     "seasonality": [{"period": "1d", "amplitude": 5, "peak": "15h"}],
                     "noise": {"normal": {"stddev": 0.5}},
                     "round": 2,
-                    "missing": 0.05,
+                    "anomalies": [
+                        {
+                            "name": "heatwave",
+                            "add": 8,
+                            "between": ["2026-01-01T12:00:00Z", "2026-01-01T17:00:00Z"],
+                        }
+                    ],
                 }
             },
         },

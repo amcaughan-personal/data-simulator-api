@@ -17,7 +17,7 @@ from data_simulator.engine.frame import Frame, GenerationError
 from data_simulator.engine.output import to_rows
 from data_simulator.engine.rows import layout_rows
 from data_simulator.rng import new_seed, rng_for
-from data_simulator.spec import ColumnSpec, DatasetSpec
+from data_simulator.spec import Anomaly, ColumnSpec, DatasetSpec
 
 __all__ = ["GenerationError", "generate"]
 
@@ -40,10 +40,15 @@ def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
     if frame.profile is not None:
         frame.columns[spec.profile_column] = np.array(frame.profile_names, dtype=object)[frame.profile]
 
+    if spec.has_anomalies:
+        frame.anomaly_labels = np.full(frame.n, None, dtype=object)
+
     for name in spec.column_order:
         frame.columns[name] = _generate_column(name, spec, frame)
 
-    names = [*spec.generated_columns, *spec.column_order]
+    if frame.anomaly_labels is not None:
+        frame.columns[spec.anomaly_column] = frame.anomaly_labels
+    names = spec.output_columns
     return {
         "name": spec.name,
         "description": spec.description,
@@ -78,6 +83,11 @@ def _generate_column(name: str, spec: DatasetSpec, frame: Frame) -> np.ndarray:
                 values[missing] = None
             else:
                 values = np.where(missing, np.nan, values)
+        for index, anomaly in enumerate(column.anomalies):
+            anomaly_rng = rng_for(frame.seed, "column", name, key, "anomaly", index)
+            values = _apply_anomaly(anomaly, values, rows, frame, anomaly_rng)
+        if column.anomalies and column.round is not None and values.dtype != object:
+            values = np.round(values, column.round)  # anomalies may break the normal range, not the rounding
         result[rows] = values
     return result
 
@@ -90,6 +100,35 @@ def _groups(name: str, spec: DatasetSpec, frame: Frame) -> list[tuple[ColumnSpec
         (profile.columns[name], np.flatnonzero(frame.profile == index), profile_name)
         for index, (profile_name, profile) in enumerate(spec.profiles.items())
     ]
+
+
+def _apply_anomaly(
+    anomaly: Anomaly, values: np.ndarray, rows: np.ndarray, frame: Frame, rng: np.random.Generator
+) -> np.ndarray:
+    hit = np.ones(len(rows), dtype=bool)
+    if anomaly.between is not None:
+        start, end = (np.datetime64(t.replace(tzinfo=None), "ms") for t in anomaly.between)
+        timestamps = frame.timestamps[rows]
+        hit &= (timestamps >= start) & (timestamps < end)
+    if anomaly.chance is not None:
+        hit &= rng.random(len(rows)) < anomaly.chance
+    if not hit.any():
+        return values
+
+    values = values.copy()
+    if anomaly.multiply is not None:
+        values[hit] = values[hit] * anomaly.multiply
+    elif anomaly.add is not None:
+        values[hit] = values[hit] + anomaly.add
+    elif values.dtype == object:
+        values[hit] = anomaly.set
+    else:
+        values[hit] = np.nan if anomaly.set is None else float(anomaly.set)
+
+    labels = frame.anomaly_labels
+    for row in rows[hit]:
+        labels[row] = anomaly.name if labels[row] is None else f"{labels[row]}, {anomaly.name}"
+    return values
 
 
 def _per_individual(

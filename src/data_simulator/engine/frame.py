@@ -31,4 +31,5 @@ class Frame:
     time_origin: np.datetime64 | None = None
     series: np.ndarray | None = None
     columns: dict[str, np.ndarray] = field(default_factory=dict)
+    anomaly_labels: np.ndarray | None = None
     integer_columns: set[str] = field(default_factory=set)

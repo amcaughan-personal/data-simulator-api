@@ -23,7 +23,7 @@ def _to_python(values: np.ndarray, integer: bool) -> list[Any]:
 
     floats = values.tolist()
     if integer:
-        return [None if math.isnan(value) else int(value) for value in floats]
+        return [None if math.isnan(value) else int(round(value)) for value in floats]
     return [None if math.isnan(value) else value for value in floats]
 
 
