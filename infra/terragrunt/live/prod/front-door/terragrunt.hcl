@@ -2,6 +2,10 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
+locals {
+  env = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
+}
+
 # The public entry point. To use a different front door (e.g. API Gateway), point this
 # at another module under modules/front-door/ that takes the same two inputs.
 terraform {
@@ -19,9 +23,9 @@ dependency "api_function" {
 }
 
 inputs = {
-  name          = "data-simulator-api"
+  name          = local.env.name
   origin_domain = dependency.api_function.outputs.function_url_domain
   origin_secret = dependency.api_function.outputs.origin_secret
 
-  requests_per_5_minutes_per_ip = 100
+  requests_per_5_minutes_per_ip = local.env.requests_per_5_minutes_per_ip
 }

@@ -1,6 +1,11 @@
-# The API as a Lambda function with a function URL. Whatever sits in front of it (the
-# front-door stack) must send the origin secret in X-Origin-Verify; the app rejects
-# everything else, so the function URL is useless to call directly.
+# The API as a Lambda function behind a `live` alias with a function URL. Whatever sits in
+# front of it (the front-door stack) must send the origin secret in X-Origin-Verify; the
+# app rejects everything else, so the function URL is useless to call directly.
+#
+# Terraform owns the function's configuration; CI owns its code. Deploys upload code,
+# publish a numbered version and move the alias to it through CodeDeploy (the deployment
+# stack). Configuration changes made here reach traffic with the next deploy, because
+# each published version keeps the configuration it was published with.
 
 resource "random_password" "origin_secret" {
   length  = 48
@@ -73,29 +78,51 @@ resource "aws_lambda_function" "this" {
   }
 
   depends_on = [aws_iam_role_policy.logs]
+
+  lifecycle {
+    # The package here is only for creating the function; deploys own the code after that.
+    ignore_changes = [filename, source_code_hash]
+  }
 }
 
-resource "aws_lambda_function_url" "this" {
+# Traffic always goes through this alias. Deploys point it at new versions (gradually, in
+# production), so Terraform sets it only at creation.
+resource "aws_lambda_alias" "live" {
+  name             = "live"
+  function_name    = aws_lambda_function.this.function_name
+  function_version = "$LATEST"
+
+  lifecycle {
+    ignore_changes = [function_version, routing_config]
+  }
+}
+
+resource "aws_lambda_function_url" "live" {
   #checkov:skip=CKV_AWS_258:No IAM auth by design: CloudFront can't sign POST bodies for Lambda origins without per-request-billed Lambda@Edge. The app rejects requests without the origin secret instead.
   function_name      = aws_lambda_function.this.function_name
+  qualifier          = aws_lambda_alias.live.name
   authorization_type = "NONE" # access is controlled by the origin secret instead
 }
 
-# A function URL without IAM auth needs both of these in the function's resource policy.
-resource "aws_lambda_permission" "function_url" {
+resource "aws_lambda_permission" "live_function_url" {
   #checkov:skip=CKV_AWS_301:Public URL permission is required for a function URL without IAM auth; requests still need the origin secret
-  statement_id           = "AllowPublicFunctionUrl"
+  statement_id           = "AllowPublicFunctionUrlLive"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.this.function_name
+  qualifier              = aws_lambda_alias.live.name
   principal              = "*"
   function_url_auth_type = "NONE"
 }
 
-resource "aws_lambda_permission" "invoke_via_url" {
+resource "aws_lambda_permission" "live_invoke_via_url" {
   #checkov:skip=CKV_AWS_301:Same as the function URL permission above
-  statement_id             = "AllowInvokeViaFunctionUrl"
+  statement_id             = "AllowInvokeViaFunctionUrlLive"
   action                   = "lambda:InvokeFunction"
   function_name            = aws_lambda_function.this.function_name
+  qualifier                = aws_lambda_alias.live.name
   principal                = "*"
   invoked_via_function_url = true
+
+  # Lambda rejects concurrent permission changes on one function, so add them one at a time.
+  depends_on = [aws_lambda_permission.live_function_url]
 }

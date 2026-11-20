@@ -3,12 +3,16 @@ output "function_name" {
 }
 
 output "function_url" {
-  value = aws_lambda_function_url.this.function_url
+  value = aws_lambda_function_url.live.function_url
 }
 
 output "function_url_domain" {
-  description = "Host name of the function URL, for use as an origin."
-  value       = split("/", aws_lambda_function_url.this.function_url)[2]
+  description = "Host name of the live alias's function URL, for use as an origin."
+  value       = split("/", aws_lambda_function_url.live.function_url)[2]
+}
+
+output "alias_name" {
+  value = aws_lambda_alias.live.name
 }
 
 output "origin_secret" {

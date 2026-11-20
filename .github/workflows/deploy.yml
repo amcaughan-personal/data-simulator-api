@@ -1,0 +1,79 @@
+name: deploy
+
+# Every merge to main: build the package once, deploy it to staging and smoke-test it,
+# then deploy the same package to production (after approval, if the production
+# environment requires it) with a canary, and smoke-test again.
+#
+# Infrastructure (Terraform) is applied by hand; this only ships code. To roll back,
+# re-run an earlier run of this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, in order; never cancel one halfway through.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: scripts/build-lambda.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lambda-package
+          path: dist/lambda.zip
+          if-no-files-found: error
+
+  staging:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://d3ede7d9l0upni.cloudfront.net
+    permissions:
+      contents: read
+      id-token: write # to sign in to AWS as this environment's deploy role
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: lambda-package
+          path: dist
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::766316140501:role/data-simulator-api-staging-deploy
+          aws-region: us-east-2
+      - run: scripts/deploy.sh data-simulator-api-staging dist/lambda.zip
+      - run: scripts/smoke-test.sh https://d3ede7d9l0upni.cloudfront.net
+
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://d1dfbd1pkurhz5.cloudfront.net
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: lambda-package
+          path: dist
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::766316140501:role/data-simulator-api-deploy
+          aws-region: us-east-2
+      - run: scripts/deploy.sh data-simulator-api dist/lambda.zip
+      - run: scripts/smoke-test.sh https://d1dfbd1pkurhz5.cloudfront.net

@@ -1,8 +1,20 @@
 # AWS architecture
 
-The API runs as a single Lambda function behind CloudFront. The goal of the setup is
-that **the worst-case cost is bounded by construction**, and that the function can only
-be reached through the front door.
+The API runs as a Lambda function behind CloudFront, in two identical environments:
+**staging** and **production**. The goals of the setup:
+
+- **The worst-case cost is bounded by construction.**
+- **The function can only be reached through the front door.**
+- **Every merge ships itself safely:** staging first, then a canary in production that
+  rolls back on errors.
+
+| | Production | Staging |
+|---|---|---|
+| URL | https://d1dfbd1pkurhz5.cloudfront.net | https://d3ede7d9l0upni.cloudfront.net |
+| Function | `data-simulator-api` | `data-simulator-api-staging` |
+| Reserved concurrency | 2 | 1 |
+| Circuit breaker | 1,000 / 5 min, 20,000 / day | 200 / 5 min, 2,000 / day |
+| New versions | 10% canary for 5 minutes, then all traffic | all at once |
 
 ## How a request flows
 
@@ -19,7 +31,7 @@ flowchart LR
     cf -->|"adds X-Origin-Verify: secret"| url
 
     subgraph region["us-east-2"]
-        url[Lambda function URL]
+        url[Function URL on the live alias]
         fn[Lambda function<br/>Python 3.12 · arm64 · 512 MB<br/>reserved concurrency 2]
         logs[(CloudWatch Logs<br/>14 days)]
         url --> fn --> logs
@@ -36,7 +48,7 @@ flowchart LR
 
 1. **CloudFront** terminates HTTPS at the nearest edge location. Plain HTTP is refused.
 2. **WAF** blocks an IP that sends more than 100 requests in 5 minutes, and anything on AWS's IP reputation list. Blocked requests never reach the function.
-3. CloudFront forwards the request to the **Lambda function URL**, adding an `X-Origin-Verify` header with a secret. It overwrites any header of that name a client sends.
+3. CloudFront forwards the request to the **function URL of the `live` alias**, adding an `X-Origin-Verify` header with a secret. It overwrites any header of that name a client sends.
 4. The **app** rejects any request without the right secret (`403`), so calling the function URL directly gets nowhere. It then validates the spec, generates the data, and returns JSON or CSV.
 5. **CloudWatch alarms** watch the function's invocations. Above 1,000 in 5 minutes or 20,000 in a day, the **circuit breaker** sets the function's concurrency to 0, so every request is throttled (`429`) and nothing more is billed. You also get an email.
 
@@ -77,8 +89,40 @@ burst alarm set the function's concurrency to 0 within seconds; requests then go
 function stack, which restores its configured concurrency.
 
 ```bash
-cd infra/terragrunt/live/prod/api-function && terragrunt apply   # plan shows concurrency 0 -> 2
+cd infra/terragrunt/live/prod/api-function && terragrunt apply   # plan shows concurrency 0 -> 2 (staging: live/staging)
 ```
+
+## How code is deployed
+
+Every merge to main runs the [deploy workflow](../.github/workflows/deploy.yml):
+
+```mermaid
+flowchart LR
+    build[Build lambda.zip<br/>once] --> stg[Staging<br/>deploy all at once<br/>smoke test]
+    stg --> gate{Approval<br/>production environment}
+    gate --> canary[Production<br/>10% for 5 min] --> full[100%<br/>smoke test]
+    canary -. error alarm .-> back[CodeDeploy moves<br/>the alias back]
+```
+
+- **One package, promoted:** the zip is built once and the same file goes to both environments.
+- **Versions and an alias:** each deploy uploads the code, publishes it as an immutable
+  numbered version, and asks **CodeDeploy** to move the `live` alias to it. Traffic only
+  ever reaches the alias. In production the shift is a canary: 10% of requests for 5
+  minutes, then all of them. If the alias's error alarm fires during a deployment,
+  CodeDeploy moves it back on its own.
+- **Approval:** production jobs wait for a reviewer, enforced by the GitHub `production`
+  environment (managed in personal_infra). Turning that off makes it pure CI/CD, with no
+  workflow change.
+- **No stored AWS keys:** each job signs in through GitHub's OIDC provider as its
+  environment's deploy role. A role trusts only jobs in its own environment, so only
+  `main`, and in production only after approval, can get credentials. It can upload,
+  publish and deploy that one function, and nothing else.
+- **Rolling back:** re-run an earlier run of the workflow (or let the alarm do it during
+  a canary). Versions are immutable, so the old code is still there.
+- **Who owns what:** Terraform owns the function's configuration and creates the alias;
+  CI owns the code and which version the alias points to (Terraform ignores both).
+  Configuration changes reach traffic with the next deploy, because each published
+  version keeps the configuration it was published with.
 
 ## Infrastructure as code
 
@@ -89,30 +133,40 @@ infra/terragrunt/
     api-function/               Lambda + function URL + log group + least-privilege role
     front-door/cloudfront/      CloudFront + WAF + Free plan subscription
     circuit-breaker/            alarms + a Lambda that stops the function when they fire
-  live/prod/
-    api-function/               the function
-    front-door/                 the public entry point; reads api-function's outputs
-    circuit-breaker/            watches api-function
+    deployment/                 CodeDeploy + rollback alarm + the role CI deploys as
+  live/
+    prod/
+      env.hcl                   everything that differs per environment (names, limits, rollout)
+      api-function/             the function and its live alias
+      front-door/               the public entry point; reads api-function's outputs
+      circuit-breaker/          watches api-function
+      deployment/               how code reaches the live alias
+    staging/                    the same stacks, with staging's env.hcl
 ```
+
+The stack files are identical in both environments; only `env.hcl` differs.
 
 The front door is its own stack. Another front door (for example API Gateway) would be
 a module under `modules/front-door/` taking the same two inputs (`origin_domain`,
-`origin_secret`), with `live/prod/front-door` pointed at it. The function stack wouldn't change.
+`origin_secret`), with each environment's `front-door` stack pointed at it. The function
+stack wouldn't change.
 
-## Building and deploying
+## Changing infrastructure
+
+Infrastructure is applied by hand, plan first, staging before production:
 
 ```bash
-./scripts/build-lambda.sh                         # dist/lambda.zip
 local-dev/dev-shell.sh                            # shell with pinned Terraform and Terragrunt
-cd infra/terragrunt/live/prod/api-function && terragrunt apply
-cd ../front-door && terragrunt apply              # only when the front door changes
+cd infra/terragrunt/live/staging/api-function && terragrunt plan -out=plan && terragrunt apply plan
+cd ../../prod/api-function && terragrunt plan -out=plan && terragrunt apply plan
 ```
 
-`build-lambda.sh` packages the app with its runtime dependencies as Linux arm64 wheels.
-The zip is reproducible (sorted entries, fixed timestamps), so Terraform only redeploys
-when the code actually changes.
+`scripts/build-lambda.sh` builds `dist/lambda.zip` (Linux arm64 wheels, reproducible:
+sorted entries, fixed timestamps). Terraform only needs it to create a function; after
+that, code arrives through the deploy workflow. `scripts/deploy.sh <function> <zip>`
+also works by hand, with credentials that can deploy.
 
-Applies are manual and plan-first. Provider versions are pinned by committed lock files.
+Provider versions are pinned by committed lock files.
 
 ## Checking it
 
