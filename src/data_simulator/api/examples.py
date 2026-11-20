@@ -30,12 +30,12 @@ TRANSACTIONS: dict[str, Any] = {
         },
     },
     "common_columns": {
-        "channel": {"categorical": {"in_store": 6, "online": 4}},
+        "channel": {"categorical": {"in_store": 0.6, "online": 0.4}},
     },
     "rows": {
         "count": 200,
         "between": ["2026-03-01T00:00:00Z", "2026-03-08T00:00:00Z"],
-        "from": {"standard_card": 8, "premium_card": 2},
+        "from": {"standard_card": 0.8, "premium_card": 0.2},
     },
     "profile_column": "card_type",
     "id_column": "card_id",

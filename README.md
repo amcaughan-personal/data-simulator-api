@@ -28,12 +28,12 @@ Card transactions from two kinds of card. Premium cards spend more and are decli
     }
   },
   "common_columns": {
-    "channel": {"categorical": {"in_store": 6, "online": 4}}
+    "channel": {"categorical": {"in_store": 0.6, "online": 0.4}}
   },
   "rows": {
     "count": 200,
     "between": ["2026-03-01", "2026-03-08"],
-    "from": {"standard_card": 8, "premium_card": 2}
+    "from": {"standard_card": 0.8, "premium_card": 0.2}
   },
   "profile_column": "card_type",
   "id_column": "card_id"
@@ -61,7 +61,7 @@ Same spec and seed, same data.
 | `rows` | Gives you |
 |---|---|
 | `{"count": 500}` | 500 rows |
-| `{"count": 500, "from": {"a": 8, "b": 2}}` | rows drawn 80/20 from profiles `a` and `b` |
+| `{"count": 500, "from": {"a": 0.8, "b": 0.2}}` | 80% of rows from profile `a`, 20% from `b` |
 | `{"count": 1000, "between": ["2026-01-01", "2026-02-01"]}` | rows at random times |
 | `{"every": "1h", "count": 168}` | a regular time series |
 | `{"one_each": true}` | one row per individual, e.g. a table of institutions |
@@ -77,7 +77,7 @@ Same spec and seed, same data.
 | `{"exponential": {"mean": 5}}` | waiting times |
 | `{"poisson": {"mean": 3}}` | counts |
 | `{"bernoulli": 0.3}` | 1 with 30% chance, else 0 |
-| `{"categorical": {"west": 3, "east": 1}}` | picked from a list (weights optional) |
+| `{"categorical": {"west": 0.75, "east": 0.25}}` | picked with these probabilities (adding up to 1); a plain list means equally likely |
 | `{"constant": 21}` | always the same |
 | `{"sequence": {"start": 1}}` | 1, 2, 3, ... |
 

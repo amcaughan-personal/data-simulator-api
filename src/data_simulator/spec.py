@@ -31,6 +31,12 @@ def _exactly_one(model: BaseModel, keys: tuple[str, ...], what: str) -> str:
     return present[0]
 
 
+def _check_probabilities(probabilities: dict[str, float], what: str) -> None:
+    if any(p < 0 for p in probabilities.values()) or abs(sum(probabilities.values()) - 1) > 1e-6:
+        total = round(sum(probabilities.values()), 6)
+        raise ValueError(f"{what} must be non-negative and add up to 1 (they add up to {total})")
+
+
 # --------------------------------------------------------------------------------------
 # Distribution parameters
 # --------------------------------------------------------------------------------------
@@ -153,7 +159,8 @@ class ColumnSpec(_Model):
     constant: str | int | float | bool | None = None
     sequence: SequenceParams | None = None
     categorical: list[str] | dict[str, float] | None = Field(
-        None, description="Values to pick from, optionally weighted: {'west': 3, 'east': 1}."
+        None,
+        description="A list (equally likely) or probabilities adding up to 1: {'west': 0.75, 'east': 0.25}.",
     )
     bernoulli: float | None = Field(None, ge=0, le=1, description="Chance of a 1 (otherwise 0).")
 
@@ -186,9 +193,7 @@ class ColumnSpec(_Model):
         if self.min is not None and self.max is not None and self.max < self.min:
             raise ValueError("max must be >= min")
         if isinstance(self.categorical, dict):
-            weights = self.categorical.values()
-            if any(weight < 0 for weight in weights) or sum(weights) <= 0:
-                raise ValueError("categorical weights must be non-negative and not all zero")
+            _check_probabilities(self.categorical, "categorical probabilities")
         return self
 
     @property
@@ -256,7 +261,7 @@ class RowsSpec(_Model):
     from_: dict[Name, float] | None = Field(
         None,
         alias="from",
-        description="Relative frequency of each profile, e.g. {'standard': 8, 'premium': 2}.",
+        description="Share of rows from each profile, adding up to 1: {'standard': 0.8, 'premium': 0.2}.",
     )
     timestamp_column: Name = "timestamp"
 
@@ -275,10 +280,8 @@ class RowsSpec(_Model):
             raise ValueError("rows: set 'count' (or 'one_each': true)")
         if self.between is not None and self.between[1] <= self.between[0]:
             raise ValueError("rows: 'between' end must be after start")
-        if self.from_ is not None and (
-            any(w < 0 for w in self.from_.values()) or sum(self.from_.values()) <= 0
-        ):
-            raise ValueError("rows: 'from' frequencies must be non-negative and not all zero")
+        if self.from_ is not None:
+            _check_probabilities(self.from_, "rows: 'from' shares")
 
         self.start = _as_utc(self.start)
         if self.between is not None:

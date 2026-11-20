@@ -52,6 +52,10 @@ def test_row_shapes(rows, expected):
         ),
         ({"rows": {"count": 5}, "common_columns": {"x": {"normal": {}, "poisson": {}}}}, "exactly one of"),
         (
+            {"rows": {"count": 5}, "common_columns": {"x": {"categorical": {"a": 6, "b": 4}}}},
+            "add up to 1",
+        ),
+        (
             {"rows": {"count": 5}, "common_columns": {"y": {"normal": {}, "add": "x"}, "x": {"normal": {}}}},
             "must be an earlier column",
         ),

@@ -31,7 +31,7 @@ def test_adding_a_column_leaves_other_columns_unchanged():
 def test_profiles_set_frequency_and_their_own_distributions():
     raw = {
         "seed": 1,
-        "rows": {"count": 10000, "from": {"standard": 8, "premium": 2}},
+        "rows": {"count": 10000, "from": {"standard": 0.8, "premium": 0.2}},
         "profiles": {
             "standard": {"columns": {"amount": {"lognormal": {"median": 35, "sigma": 0.5}}}},
             "premium": {"columns": {"amount": {"lognormal": {"median": 60, "sigma": 0.5}}}},
