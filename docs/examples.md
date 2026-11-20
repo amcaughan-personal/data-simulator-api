@@ -20,7 +20,7 @@ Card transactions from two kinds of card. Premium cards spend more and are decli
 
 ```json
 {
-  "seed": 42,
+  "seed": 34,
   "profiles": {
     "standard_card": {
       "count": 32,
@@ -52,13 +52,20 @@ Card transactions from two kinds of card. Premium cards spend more and are decli
 }
 ```
 
+The first 10 rows:
+
 | timestamp | card_id | card_type | channel | amount | items | declined |
 |---|---|---|---|---|---|---|
-| 2026-03-01T00:28:43Z | standard_card_0007 | standard_card | online | 13.35 | 1 | 0 |
-| 2026-03-01T00:47:17Z | standard_card_0004 | standard_card | in_store | 66.03 | 2 | 0 |
-| 2026-03-01T01:03:32Z | standard_card_0002 | standard_card | in_store | 36.12 | 2 | 0 |
-| 2026-03-01T01:12:11Z | premium_card_0001 | premium_card | in_store | 47.55 | 3 | 1 |
-| 2026-03-01T01:17:46Z | standard_card_0031 | standard_card | in_store | 30.86 | 3 | 0 |
+| 2026-03-01T00:43:13Z | premium_card_0006 | premium_card | in_store | 35.37 | 6 | 0 |
+| 2026-03-01T03:09:27Z | standard_card_0030 | standard_card | in_store | 40.98 | 2 | 0 |
+| 2026-03-01T03:16:53Z | standard_card_0021 | standard_card | in_store | 41.0 | 1 | 0 |
+| 2026-03-01T05:19:05Z | standard_card_0020 | standard_card | in_store | 16.94 | 1 | 1 |
+| 2026-03-01T05:26:02Z | standard_card_0029 | standard_card | in_store | 84.43 | 3 | 0 |
+| 2026-03-01T06:14:11Z | premium_card_0002 | premium_card | online | 92.47 | 2 | 0 |
+| 2026-03-01T07:09:57Z | standard_card_0016 | standard_card | online | 36.89 | 1 | 0 |
+| 2026-03-01T08:40:25Z | premium_card_0003 | premium_card | online | 66.39 | 3 | 0 |
+| 2026-03-01T08:50:14Z | standard_card_0010 | standard_card | online | 11.45 | 4 | 0 |
+| 2026-03-01T09:01:15Z | standard_card_0032 | standard_card | in_store | 128.93 | 3 | 0 |
 
 ## One row per institution
 
@@ -66,7 +73,7 @@ Three profiles with their own size distributions; `one_each` gives one row per i
 
 ```json
 {
-  "seed": 7,
+  "seed": 1,
   "profiles": {
     "bank":         {"count": 12, "columns": {"employees": {"lognormal": {"median": 1000, "sigma": 0.9}, "round": 0}, "is_public": {"bernoulli": 0.5}}},
     "credit_union": {"count": 8,  "columns": {"employees": {"lognormal": {"median": 160, "sigma": 0.7}, "round": 0},  "is_public": {"constant": 0}}},
@@ -77,13 +84,20 @@ Three profiles with their own size distributions; `one_each` gives one row per i
 }
 ```
 
+10 of the 25 rows, from each kind of institution:
+
 | id | profile | region | employees | is_public |
 |---|---|---|---|---|
-| bank_0001 | bank | midwest | 613 | 0 |
-| bank_0002 | bank | midwest | 353 | 1 |
-| credit_union_0001 | credit_union | west | 61 | 0 |
-| credit_union_0002 | credit_union | midwest | 148 | 0 |
-| insurer_0001 | insurer | west | 197 | 0 |
+| bank_0001 | bank | northeast | 1649 | 1 |
+| bank_0002 | bank | midwest | 4562 | 1 |
+| bank_0003 | bank | west | 524 | 0 |
+| bank_0004 | bank | northeast | 1108 | 0 |
+| credit_union_0001 | credit_union | west | 276 | 0 |
+| credit_union_0002 | credit_union | south | 253 | 0 |
+| credit_union_0003 | credit_union | south | 126 | 0 |
+| insurer_0001 | insurer | northeast | 335 | 1 |
+| insurer_0002 | insurer | midwest | 911 | 0 |
+| insurer_0003 | insurer | midwest | 404 | 1 |
 
 ## Hourly readings per sensor, with anomalies
 
@@ -104,14 +118,20 @@ Each sensor gets a fixed calibration offset (`"per": "id"`) that its temperature
 }
 ```
 
+All five sensors at 11:00 and 12:00, when the outdoor heatwave starts:
+
 | timestamp | id | profile | calibration_offset | temperature_c | anomaly |
 |---|---|---|---|---|---|
-| 2026-01-01T10:00:00Z | outdoor_0001 | outdoor | 0.27 | 13.16 |  |
+| 2026-01-01T11:00:00Z | indoor_0001 | indoor | -0.05 |  | sensor_dead |
+| 2026-01-01T11:00:00Z | indoor_0002 | indoor | -0.24 | 20.67 |  |
+| 2026-01-01T11:00:00Z | indoor_0003 | indoor | -0.51 | 20.52 |  |
 | 2026-01-01T11:00:00Z | outdoor_0001 | outdoor | 0.27 | 14.31 |  |
+| 2026-01-01T11:00:00Z | outdoor_0002 | outdoor | -0.17 | 13.85 |  |
+| 2026-01-01T12:00:00Z | indoor_0001 | indoor | -0.05 | 20.7 |  |
+| 2026-01-01T12:00:00Z | indoor_0002 | indoor | -0.24 | 20.66 |  |
+| 2026-01-01T12:00:00Z | indoor_0003 | indoor | -0.51 | 20.57 |  |
 | 2026-01-01T12:00:00Z | outdoor_0001 | outdoor | 0.27 | 23.68 | heatwave |
-| 2026-01-01T13:00:00Z | outdoor_0001 | outdoor | 0.27 | 23.73 | heatwave |
-| 2026-01-01T14:00:00Z | outdoor_0001 | outdoor | 0.27 | 24.52 | heatwave |
-| 2026-01-01T10:00:00Z | indoor_0002 | indoor | -0.24 |  | sensor_dead |
+| 2026-01-01T12:00:00Z | outdoor_0002 | outdoor | -0.17 | 23.8 | heatwave |
 
 ## Web traffic with growth and cycles
 
@@ -119,7 +139,7 @@ One time series, no profiles: growing 1% a day, busiest at 2pm and midweek, with
 
 ```json
 {
-  "seed": 11,
+  "seed": 1,
   "common_columns": {
     "page_views": {
       "constant": 1000,
@@ -132,14 +152,20 @@ One time series, no profiles: growing 1% a day, busiest at 2pm and midweek, with
 }
 ```
 
+The first day from 08:00 to 17:00, rising to the afternoon peak:
+
 | timestamp | page_views |
 |---|---|
-| 2026-03-02T10:00:00Z | 1177 |
-| 2026-03-02T11:00:00Z | 1349 |
-| 2026-03-02T12:00:00Z | 1352 |
-| 2026-03-02T13:00:00Z | 1366 |
-| 2026-03-02T14:00:00Z | 1455 |
-| 2026-03-02T15:00:00Z | 1515 |
+| 2026-03-02T08:00:00Z | 1048 |
+| 2026-03-02T09:00:00Z | 1079 |
+| 2026-03-02T10:00:00Z | 1185 |
+| 2026-03-02T11:00:00Z | 1262 |
+| 2026-03-02T12:00:00Z | 1308 |
+| 2026-03-02T13:00:00Z | 1372 |
+| 2026-03-02T14:00:00Z | 1481 |
+| 2026-03-02T15:00:00Z | 1450 |
+| 2026-03-02T16:00:00Z | 1459 |
+| 2026-03-02T17:00:00Z | 1287 |
 
 ## Card fraud as a rare profile
 
@@ -147,7 +173,7 @@ Fraud isn't a tweak to normal transactions; it's a different kind of behaviour. 
 
 ```json
 {
-  "seed": 21,
+  "seed": 2,
   "profiles": {
     "normal": {
       "count": 500,
@@ -220,13 +246,20 @@ Fraud isn't a tweak to normal transactions; it's a different kind of behaviour. 
 }
 ```
 
+7 normal and 3 fraudulent transactions:
+
 | card_id | label | merchant_type | amount | hour | is_foreign |
 |---|---|---|---|---|---|
-| normal_0434 | normal | online | 26.66 | 9 | 0 |
-| normal_0110 | normal | grocery | 19.36 | 13 | 0 |
-| normal_0269 | normal | grocery | 87.33 | 16 | 0 |
-| fraud_0001 | fraud | online | 531.02 | 3 | 1 |
-| fraud_0001 | fraud | online | 270.18 | 7 | 0 |
+| normal_0452 | normal | online | 200.74 | 19 | 0 |
+| normal_0187 | normal | online | 166.46 | 17 | 0 |
+| normal_0029 | normal | online | 18.8 | 18 | 0 |
+| normal_0495 | normal | retail | 38.54 | 12 | 0 |
+| normal_0013 | normal | retail | 30.3 | 11 | 0 |
+| normal_0208 | normal | online | 39.37 | 14 | 0 |
+| normal_0262 | normal | retail | 66.02 | 12 | 0 |
+| fraud_0004 | fraud | grocery | 211.69 | 3 | 1 |
+| fraud_0002 | fraud | retail | 468.15 | 4 | 1 |
+| fraud_0002 | fraud | online | 727.6 | 4 | 1 |
 
 ## Survey responses
 
@@ -234,7 +267,7 @@ The simplest kind of dataset: no profiles and no time, just independent rows. Sc
 
 ```json
 {
-  "seed": 5,
+  "seed": 1,
   "common_columns": {
     "response_id": {
       "sequence": {
@@ -275,13 +308,20 @@ The simplest kind of dataset: no profiles and no time, just independent rows. Sc
 }
 ```
 
+The first 10 responses:
+
 | response_id | age_group | satisfaction | would_recommend | comment_length |
 |---|---|---|---|---|
-| 1001 | 18-29 | 4 | 0 |  |
-| 1002 | 45-64 | 5 | 1 | 3 |
-| 1003 | 45-64 | 5 | 0 | 11 |
-| 1004 | 18-29 | 7 | 1 |  |
-| 1005 | 30-44 | 10 | 1 | 92 |
+| 1001 | 65+ | 6 | 1 | 3 |
+| 1002 | 45-64 | 8 | 1 | 16 |
+| 1003 | 18-29 | 5 | 1 | 123 |
+| 1004 | 18-29 | 7 | 1 | 76 |
+| 1005 | 18-29 | 9 | 0 | 114 |
+| 1006 | 18-29 | 8 | 1 |  |
+| 1007 | 18-29 | 9 | 0 |  |
+| 1008 | 30-44 | 10 | 0 |  |
+| 1009 | 45-64 | 6 | 1 | 30 |
+| 1010 | 18-29 | 9 | 1 | 23 |
 
 ## Daily sales per store
 
@@ -289,7 +329,7 @@ A daily series for each of 4 stores. Each store gets a size fixed for its whole 
 
 ```json
 {
-  "seed": 8,
+  "seed": 2,
   "profiles": {
     "store": {
       "count": 4,
@@ -347,13 +387,20 @@ A daily series for each of 4 stores. Each store gets a size fixed for its whole 
 }
 ```
 
+All four stores the day before and the first days of the holiday rush:
+
 | timestamp | store_id | profile | size | sales | anomaly |
 |---|---|---|---|---|---|
-| 2026-10-01T00:00:00Z | store_0001 | store | 1.27 | 5724 |  |
-| 2026-10-02T00:00:00Z | store_0001 | store | 1.27 | 6925 |  |
-| 2026-10-03T00:00:00Z | store_0001 | store | 1.27 | 8041 |  |
-| 2026-11-27T00:00:00Z | store_0001 | store | 1.27 | 20430 | holiday_rush |
-| 2026-11-27T00:00:00Z | store_0002 | store | 1.27 | 20575 | holiday_rush |
+| 2026-11-26T00:00:00Z | store_0001 | store | 1.26 | 6933 |  |
+| 2026-11-26T00:00:00Z | store_0002 | store | 0.94 | 4902 |  |
+| 2026-11-26T00:00:00Z | store_0003 | store | 0.65 | 3984 |  |
+| 2026-11-26T00:00:00Z | store_0004 | store | 0.86 | 4942 |  |
+| 2026-11-27T00:00:00Z | store_0001 | store | 1.26 | 20292 | holiday_rush |
+| 2026-11-27T00:00:00Z | store_0002 | store | 0.94 | 14890 | holiday_rush |
+| 2026-11-27T00:00:00Z | store_0003 | store | 0.65 | 11600 | holiday_rush |
+| 2026-11-27T00:00:00Z | store_0004 | store | 0.86 | 12918 | holiday_rush |
+| 2026-11-28T00:00:00Z | store_0001 | store | 1.26 | 22750 | holiday_rush |
+| 2026-11-28T00:00:00Z | store_0002 | store | 0.94 | 17300 | holiday_rush |
 
 ## Service latency with an outage
 
@@ -361,7 +408,7 @@ Request logs at random times over an afternoon. Latencies are exponential, so mo
 
 ```json
 {
-  "seed": 13,
+  "seed": 2,
   "common_columns": {
     "endpoint": {
       "categorical": {
@@ -406,13 +453,20 @@ Request logs at random times over an afternoon. Latencies are exponential, so mo
 }
 ```
 
+The 10 requests around the start of the outage:
+
 | timestamp | endpoint | latency_ms | is_error | anomaly |
 |---|---|---|---|---|
-| 2026-02-10T12:00:04Z | /checkout | 146.5 | 0 |  |
-| 2026-02-10T12:00:15Z | /search | 101.2 | 0 |  |
-| 2026-02-10T12:00:33Z | /profile | 187.6 | 0 |  |
-| 2026-02-10T14:00:11Z | /search |  | 0 | outage |
-| 2026-02-10T14:00:11Z | /search |  | 0 | outage |
+| 2026-02-10T13:59:38Z | /checkout | 220.1 | 0 |  |
+| 2026-02-10T13:59:48Z | /profile | 309.7 | 0 |  |
+| 2026-02-10T13:59:53Z | /profile | 98.7 | 0 |  |
+| 2026-02-10T13:59:55Z | /search | 94.5 | 0 |  |
+| 2026-02-10T13:59:56Z | /profile | 20.8 | 0 |  |
+| 2026-02-10T14:00:03Z | /checkout |  | 0 | outage |
+| 2026-02-10T14:00:04Z | /search |  | 0 | outage |
+| 2026-02-10T14:00:08Z | /search |  | 0 | outage |
+| 2026-02-10T14:00:24Z | /profile |  | 1 | outage |
+| 2026-02-10T14:00:25Z | /search |  | 0 | outage |
 
 ## Patients where some columns don't apply
 
@@ -420,7 +474,7 @@ One row per patient. Both groups declare the same columns, but `insulin_units` i
 
 ```json
 {
-  "seed": 30,
+  "seed": 9,
   "profiles": {
     "healthy": {
       "count": 60,
@@ -494,9 +548,17 @@ One row per patient. Both groups declare the same columns, but `insulin_units` i
 }
 ```
 
+5 healthy and 5 diabetic patients:
+
 | patient_id | group | age | sex | fasting_glucose | hba1c | insulin_units |
 |---|---|---|---|---|---|---|
-| healthy_0001 | healthy | 67 | M | 88 | 5.4 |  |
-| healthy_0002 | healthy | 87 | M | 87 | 5.6 |  |
-| diabetic_0001 | diabetic | 60 | F | 163 | 8.0 | 33 |
-| diabetic_0002 | diabetic | 51 | F | 165 | 7.2 | 28 |
+| healthy_0001 | healthy | 42 | F | 97 | 5.5 |  |
+| healthy_0002 | healthy | 62 | M | 73 | 5.4 |  |
+| healthy_0003 | healthy | 63 | F | 81 | 5.3 |  |
+| healthy_0004 | healthy | 49 | M | 96 |  |  |
+| healthy_0005 | healthy | 18 | M | 78 | 4.9 |  |
+| diabetic_0001 | diabetic | 40 | M | 169 | 8.3 | 21 |
+| diabetic_0002 | diabetic | 73 | M | 103 | 8.4 | 21 |
+| diabetic_0003 | diabetic | 46 | M | 163 | 5.8 | 35 |
+| diabetic_0004 | diabetic | 62 | M | 138 | 8.6 | 28 |
+| diabetic_0005 | diabetic | 54 | F | 148 | 6.7 | 33 |
