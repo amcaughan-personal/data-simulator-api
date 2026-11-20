@@ -1,13 +1,16 @@
-"""The dataset spec.
+"""The dataset and stream specs.
 
 A dataset is made of rows. Rows can come from one or more *profiles* (kinds of things,
 e.g. standard and premium cards), each describing its own columns with distributions.
 `common_columns` apply to every row regardless of profile.
+
+A stream uses the same profiles and columns, but its rows never end: callers fetch any
+time window of it, and every window is consistent with every other.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -24,6 +27,10 @@ MAX_INDIVIDUALS = 50_000
 MAX_CATEGORIES = 1_000
 
 DEFAULT_START = datetime(2026, 1, 1, tzinfo=UTC)
+
+# Streams: at most 60,000 rows an hour, and windows within 10 years of the stream's start.
+MAX_STREAM_ROWS_PER_HOUR = 60_000
+MAX_STREAM_SPAN = timedelta(days=3653)
 
 
 class _Model(BaseModel):
@@ -351,20 +358,67 @@ class RowsSpec(_Model):
         return self.every is not None or self.between is not None
 
 
+class StreamRows(_Model):
+    """What the stream's rows are.
+
+    - `{"rate": 120, "per": "1h"}`: events at random times, about 120 an hour
+    - `{"every": "1h"}`: a regular time series
+    - `{"every": "1h", "one_each": true}`: a time series per individual
+    """
+
+    rate: float | None = Field(None, gt=0, description="Average number of rows per `per`, at random times.")
+    per: Duration = "1h"
+    every: Duration | None = Field(None, description="Interval between time steps, e.g. '15m', '1h', '1d'.")
+    one_each: bool = Field(False, description="One series per individual (with `every`).")
+    from_: dict[Name, float] | None = Field(
+        None,
+        alias="from",
+        description="Share of rows from each profile, adding up to 1: {'standard': 0.8, 'premium': 0.2}.",
+    )
+    timestamp_column: Name = "timestamp"
+
+    @model_validator(mode="after")
+    def _check_shape(self) -> StreamRows:
+        kind = _exactly_one(self, ("rate", "every"), "stream rows")
+        if kind == "rate":
+            if self.per.total_seconds() < 1:
+                raise ValueError("rows: 'per' must be at least 1s")
+            per_hour = self.rate * 3600 / self.per.total_seconds()
+            if per_hour > MAX_STREAM_ROWS_PER_HOUR:
+                raise ValueError(
+                    f"rows: at most {MAX_STREAM_ROWS_PER_HOUR:,} rows an hour (this is {per_hour:,.0f})"
+                )
+            if self.one_each:
+                raise ValueError("rows: 'one_each' needs 'every' (a series per individual)")
+        elif self.every.total_seconds() < 1:
+            raise ValueError("rows: 'every' must be at least 1s")
+        if self.one_each and self.from_ is not None:
+            raise ValueError("rows: 'one_each' can't be combined with 'from'")
+        if self.from_ is not None:
+            _check_probabilities(self.from_, "rows: 'from' shares")
+        return self
+
+    @property
+    def has_timestamps(self) -> bool:
+        return True
+
+
 def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 # --------------------------------------------------------------------------------------
-# The dataset
+# Datasets and streams
 # --------------------------------------------------------------------------------------
 
 
-class DatasetSpec(_Model):
+class _TableSpec(_Model):
+    """What datasets and streams share: profiles, columns and their validation."""
+
     name: Name = "dataset"
     description: str | None = Field(None, max_length=500)
-    seed: int | None = Field(None, ge=0, description="Same seed, same data. Omit for a random seed.")
-    rows: RowsSpec
+    seed: int | None = None
+    rows: RowsSpec | StreamRows
     profiles: dict[Name, Profile] = Field(default_factory=dict, max_length=MAX_PROFILES)
     common_columns: dict[Name, ColumnSpec] = Field(default_factory=dict)
     profile_column: Name = "profile"
@@ -372,7 +426,7 @@ class DatasetSpec(_Model):
     anomaly_column: Name = "anomaly"
 
     @model_validator(mode="after")
-    def _check(self) -> DatasetSpec:
+    def _check(self) -> _TableSpec:
         self._check_profiles()
         if not self.column_order:
             raise ValueError("define at least one column in common_columns or profiles")
@@ -474,9 +528,66 @@ class DatasetSpec(_Model):
     def column_count(self) -> int:
         return len(self.output_columns)
 
+
+class DatasetSpec(_TableSpec):
+    """A finite dataset: `POST /v1/datasets`."""
+
+    seed: int | None = Field(None, ge=0, description="Same seed, same data. Omit for a random seed.")
+    rows: RowsSpec
+
     @property
     def row_count(self) -> int:
         if self.rows.one_each:
             individuals = sum(profile.count or 0 for profile in self.profiles.values())
             return individuals * (self.rows.count or 1)
         return self.rows.count or 0
+
+
+class StreamSpec(_TableSpec):
+    """An endless dataset: `POST /v1/streams/window` returns any time window of it."""
+
+    name: Name = "stream"
+    seed: int = Field(..., ge=0, description="Required: the seed defines the stream.")
+    rows: StreamRows
+    start: datetime = Field(
+        DEFAULT_START, description="When the stream begins. Trends and sequence numbers count from here."
+    )
+
+    @model_validator(mode="after")
+    def _check_stream(self) -> StreamSpec:
+        self.start = _as_utc(self.start)
+        for name in self.column_order:
+            for spec in self.specs_for(name):
+                if spec is not None and spec.noise is not None and spec.noise.random_walk is not None:
+                    raise ValueError(
+                        f"{name}: random_walk noise isn't available in streams "
+                        "(each value would depend on every step since the start)"
+                    )
+        return self
+
+
+class Window(_Model):
+    """A time range: rows with `from <= timestamp < to`."""
+
+    from_: datetime = Field(..., alias="from")
+    to: datetime
+
+    @model_validator(mode="after")
+    def _check(self) -> Window:
+        self.from_, self.to = _as_utc(self.from_), _as_utc(self.to)
+        if self.to <= self.from_:
+            raise ValueError("window: 'to' must be after 'from'")
+        return self
+
+
+class StreamWindowRequest(_Model):
+    stream: StreamSpec
+    window: Window
+
+    @model_validator(mode="after")
+    def _check(self) -> StreamWindowRequest:
+        if self.window.from_ < self.stream.start:
+            raise ValueError("window: 'from' can't be before the stream's start")
+        if self.window.to > self.stream.start + MAX_STREAM_SPAN:
+            raise ValueError("window: 'to' must be within 10 years of the stream's start")
+        return self

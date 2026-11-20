@@ -18,10 +18,14 @@ class Frame:
     - `profile`: index into the spec's profiles for each row (if there are profiles)
     - `individual`: index into `ids` for each row (if profiles have a count)
     - `series`: rows sharing a value form one time series (one per individual, else one)
+    - `seed`: for values drawn per row; `fixed_seed`: for values fixed per individual.
+      They differ in streams, where each time bucket has its own row seed.
+    - `row_numbers`: position of each row in the whole stream (None for datasets)
     """
 
     n: int
     seed: int
+    fixed_seed: int | None = None
     profile_names: list[str] = field(default_factory=list)
     profile: np.ndarray | None = None
     ids: np.ndarray | None = None
@@ -30,6 +34,11 @@ class Frame:
     timestamps: np.ndarray | None = None
     time_origin: np.datetime64 | None = None
     series: np.ndarray | None = None
+    row_numbers: np.ndarray | None = None
     columns: dict[str, np.ndarray] = field(default_factory=dict)
     anomaly_labels: np.ndarray | None = None
     integer_columns: set[str] = field(default_factory=set)
+
+    def __post_init__(self) -> None:
+        if self.fixed_seed is None:
+            self.fixed_seed = self.seed

@@ -68,6 +68,52 @@ An anomaly changes some values (`multiply`, `add`, or `set`, where `null` emptie
 
 Anomalies apply to rows, not to individuals. For whole kinds of unusual things (say, fraudulent cards), use a rare profile instead.
 
+## Streams: fetch any time window
+
+`POST /v1/datasets` returns one complete dataset. `POST /v1/streams/window` instead treats the spec as an **endless stream** and returns one time window of it, so a pipeline can fetch hour after hour:
+
+```json
+{
+  "stream": {
+    "seed": 3,
+    "rows": {"every": "15m", "one_each": true},
+    "profiles": {"sensor": {"count": 4, "columns": {
+      "calibration_offset": {"normal": {"stddev": 0.8}, "per": "id", "round": 2},
+      "temperature_c": {"constant": 21, "seasonality": [{"period": "1d", "amplitude": 2.5, "peak": "15h"}],
+                        "add_column": "calibration_offset", "noise": {"normal": {"stddev": 0.3}}, "round": 2}}}},
+    "common_columns": {"reading_id": {"sequence": {}}}
+  },
+  "window": {"from": "2026-03-01T09:00:00Z", "to": "2026-03-01T09:30:00Z"}
+}
+```
+
+| timestamp | id | profile | reading_id | calibration_offset | temperature_c |
+|---|---|---|---|---|---|
+| 2026-03-01T09:00:00Z | sensor_0001 | sensor | 22801 | -0.94 | 20.43 |
+| 2026-03-01T09:00:00Z | sensor_0002 | sensor | 22802 | 0.22 | 21.35 |
+| 2026-03-01T09:00:00Z | sensor_0003 | sensor | 22803 | 0.48 | 21.45 |
+| 2026-03-01T09:00:00Z | sensor_0004 | sensor | 22804 | -0.25 | 20.6 |
+| 2026-03-01T09:15:00Z | sensor_0001 | sensor | 22805 | -0.94 | 20.33 |
+| ... | | | | | |
+
+**The guarantee:** the same stream and seed always give the same rows. Fetching 09:00–10:00 and then 10:00–11:00 returns exactly what 09:00–11:00 would, and each individual keeps its fixed (`per`) values in every window. A window includes rows with `from <= timestamp < to`.
+
+The stream spec is a dataset spec with a different `rows`:
+
+| `rows` | Gives |
+|---|---|
+| `{"rate": 120, "per": "1h"}` | events at random times, about 120 an hour (`from` shares profiles as in datasets) |
+| `{"every": "15m"}` | a regular time series |
+| `{"every": "15m", "one_each": true}` | a series per individual |
+
+- **`seed` is required**: it defines the stream.
+- **`start`** (default `2026-01-01`) is when the stream begins. Windows can't start earlier, and must end within 10 years of it. Trends count from `start`.
+- **`sequence` columns number rows from `start`**, so a row has the same number whichever window returned it: a reliable key for deduplicating.
+- **`random_walk` noise isn't available**: each value would depend on every step since the start.
+- Streams are limited to 60,000 rows an hour; each window is limited by cells, like datasets.
+
+The response is a dataset response plus `start` and `window`. CSV works the same way.
+
 ## Response format and CSV
 
 JSON responses carry the data plus what's needed to reproduce it:
@@ -92,6 +138,7 @@ Every response is kept small, so a tiny request can't ask for a huge table:
 | Limit | Value |
 |---|---|
 | Cells per response (rows × columns) | 100,000 (about 3 MB of JSON) |
+| Stream rate | 60,000 rows an hour; windows within 10 years of `start` |
 | Columns | 100 |
 | Profiles | 50 |
 | Individuals across all profiles | 50,000 |
