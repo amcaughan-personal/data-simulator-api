@@ -41,3 +41,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.uv]
+# Never resolve to a package version published in the last week.
+exclude-newer = "1 week"
