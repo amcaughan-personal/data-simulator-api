@@ -18,6 +18,18 @@ def test_docs_examples_work(client, name):
     assert response.json()["row_count"] == len(response.json()["rows"])
 
 
+def test_csv_on_request(client):
+    spec = DATASET_EXAMPLES["sensor_fleet"]["value"]
+    response = client.post("/v1/datasets", json=spec, headers={"Accept": "text/csv"})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["x-seed"] == str(spec["seed"])
+
+    lines = response.text.splitlines()
+    assert lines[0] == "timestamp,id,profile,calibration_offset,temperature_c,anomaly"
+    assert len(lines) == 1 + int(response.headers["x-row-count"])
+
+
 def test_bad_requests_return_422_with_a_reason(client):
     columns = {"x": {"normal": {}}}
     invalid = client.post("/v1/datasets", json={"rows": {"one_each": True}, "common_columns": columns})
