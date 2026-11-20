@@ -138,6 +138,34 @@ class Noise(_Model):
         return self
 
 
+class Anomaly(_Model):
+    """Something unusual on some rows, recorded in the anomaly column.
+
+    `{"name": "spike", "multiply": 3, "chance": 0.01}` triples 1% of values;
+    `{"name": "outage", "set": null, "between": ["2026-01-01T10:00:00Z", "2026-01-01T12:00:00Z"]}`
+    empties every value in that window.
+    """
+
+    name: Name
+    multiply: float | None = None
+    add: float | None = None
+    set: Text | int | float | bool | None = Field(None, description="Replace the value; null empties it.")
+    chance: float | None = Field(None, ge=0, le=1, description="Chance that each row is affected.")
+    between: tuple[datetime, datetime] | None = Field(None, description="Only rows in this time window.")
+
+    @model_validator(mode="after")
+    def _check(self) -> Anomaly:
+        _exactly_one(self, ("multiply", "add", "set"), f"anomaly {self.name}")
+        if self.chance is None and self.between is None:
+            raise ValueError(f"anomaly {self.name}: set 'chance', 'between', or both")
+        if self.between is not None:
+            start, end = (_as_utc(value) for value in self.between)
+            if end <= start:
+                raise ValueError(f"anomaly {self.name}: 'between' end must be after start")
+            self.between = (start, end)
+        return self
+
+
 # An earlier numeric column (`"offset"`) or a category lookup (`{"tier": {"premium": 1.8}}`).
 Dependency = Name | dict[Name, dict[str, float]]
 
@@ -192,6 +220,7 @@ class ColumnSpec(_Model):
     max: float | None = None
     round: int | None = Field(None, ge=0, le=10, description="Decimal places; 0 gives whole numbers.")
     missing: float = Field(0.0, ge=0, le=1, description="Fraction of values left empty.")
+    anomalies: list[Anomaly] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
     def _check(self) -> ColumnSpec:
@@ -213,6 +242,13 @@ class ColumnSpec(_Model):
             raise ValueError("max must be >= min")
         if isinstance(self.categorical, dict):
             _check_probabilities(self.categorical, "categorical probabilities")
+        for anomaly in self.anomalies:
+            if not self.is_numeric and (anomaly.multiply is not None or anomaly.add is not None):
+                raise ValueError(f"anomaly {anomaly.name}: multiply and add only apply to numeric columns")
+            if self.is_numeric and anomaly.set is not None and not _is_number(anomaly.set):
+                raise ValueError(
+                    f"anomaly {anomaly.name}: a numeric column can only be set to a number or null"
+                )
         return self
 
     @property
@@ -330,6 +366,7 @@ class DatasetSpec(_Model):
     common_columns: dict[Name, ColumnSpec] = Field(default_factory=dict)
     profile_column: Name = "profile"
     id_column: Name = "id"
+    anomaly_column: Name = "anomaly"
 
     @model_validator(mode="after")
     def _check(self) -> DatasetSpec:
@@ -356,6 +393,8 @@ class DatasetSpec(_Model):
             for spec in self.specs_for(name):
                 self._check_column(name, spec, earlier)
             earlier.append(name)
+        if self.has_anomalies and self.anomaly_column in earlier:
+            raise ValueError(f"column name {self.anomaly_column!r} is used twice")
         return self
 
     def _check_profiles(self) -> None:
@@ -383,6 +422,10 @@ class DatasetSpec(_Model):
             return
         if spec.uses_time and not self.rows.has_timestamps:
             raise ValueError(f"{name}: trend and seasonality need timestamps; set rows.every or rows.between")
+        if any(anomaly.between for anomaly in spec.anomalies) and not self.rows.has_timestamps:
+            raise ValueError(
+                f"{name}: anomalies with 'between' need timestamps; set rows.every or rows.between"
+            )
         if spec.per is not None and (not self.has_ids or spec.per != self.id_column):
             raise ValueError(f"{name}: 'per' must be {self.id_column!r}, and profiles need a count")
         for ref in spec.dependencies:
@@ -404,6 +447,16 @@ class DatasetSpec(_Model):
         return names
 
     @property
+    def has_anomalies(self) -> bool:
+        return any(spec and spec.anomalies for name in self.column_order for spec in self.specs_for(name))
+
+    @property
+    def output_columns(self) -> list[str]:
+        """Every column in the response, in order: generated, defined, then the anomaly label."""
+        anomaly = [self.anomaly_column] if self.has_anomalies else []
+        return [*self.generated_columns, *self.column_order, *anomaly]
+
+    @property
     def column_order(self) -> list[str]:
         """Common columns first, then profile columns in the order the first profile lists them."""
         profile_columns = list(next(iter(self.profiles.values())).columns) if self.profiles else []
@@ -416,7 +469,7 @@ class DatasetSpec(_Model):
 
     @property
     def column_count(self) -> int:
-        return len(self.generated_columns) + len(self.column_order)
+        return len(self.output_columns)
 
     @property
     def row_count(self) -> int:

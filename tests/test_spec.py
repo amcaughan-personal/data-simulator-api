@@ -71,6 +71,13 @@ def test_row_shapes(rows, expected):
             "limit is 100",
         ),
         ({"rows": {"count": 5}, "common_columns": {"x": {"constant": "x" * 101}}}, "at most 100 characters"),
+        (
+            {
+                "rows": {"count": 5},
+                "common_columns": {"x": {"normal": {}, "anomalies": [{"name": "a", "add": 1}]}},
+            },
+            "set 'chance', 'between', or both",
+        ),
     ],
 )
 def test_invalid_specs_explain_the_problem(raw, message):

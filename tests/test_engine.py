@@ -118,6 +118,35 @@ def test_noise(noise, check):
     assert check(np.array(column(run(raw), "y")))
 
 
+def test_anomalies_change_values_and_are_labelled():
+    raw = {
+        "seed": 4,
+        "rows": {"every": "1h", "count": 2000},
+        "common_columns": {
+            "y": {
+                "constant": 10,
+                "anomalies": [
+                    {"name": "spike", "multiply": 3, "chance": 0.05},
+                    {
+                        "name": "outage",
+                        "set": None,
+                        "between": ["2026-01-02T00:00:00Z", "2026-01-02T06:00:00Z"],
+                    },
+                ],
+            }
+        },
+    }
+    rows = run(raw)["rows"]
+    spikes = [r for r in rows if r["anomaly"] == "spike"]
+    assert len(spikes) == pytest.approx(100, rel=0.3) and all(r["y"] == 30 for r in spikes)
+
+    outage = [r for r in rows if "outage" in (r["anomaly"] or "")]
+    assert [r["timestamp"][11:13] for r in outage] == ["00", "01", "02", "03", "04", "05"]
+    assert all(r["y"] is None for r in outage)
+
+    assert all(r["y"] == 10 for r in rows if r["anomaly"] is None)
+
+
 def test_missing_and_null_columns():
     raw = {
         "seed": 8,
