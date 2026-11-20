@@ -9,9 +9,11 @@ terragrunt/
   modules/
     api-function/               Lambda + function URL + log group + least-privilege role
     front-door/cloudfront/      CloudFront + WAF on the CloudFront Free flat-rate plan
+    circuit-breaker/            alarms + a Lambda that stops the function if it's overused
   live/prod/
     api-function/               the deployed function
     front-door/                 the public entry point (uses api-function's outputs)
+    circuit-breaker/            watches api-function; re-apply api-function to reset it
 ```
 
 The function only answers requests carrying the origin secret, which only the front door

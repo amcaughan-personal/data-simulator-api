@@ -20,3 +20,7 @@ output "origin_secret" {
 output "log_group_name" {
   value = aws_cloudwatch_log_group.this.name
 }
+
+output "function_arn" {
+  value = aws_lambda_function.this.arn
+}
