@@ -1,5 +1,5 @@
 # checkov:skip=CKV_DOCKER_2:Toolbox image for running Terragrunt locally, not a long-running service
-FROM ubuntu:22.04@sha256:f64b2ffc2f10ab8f8505aa56b2664bd846cbb9df87c7e2532e30f7667021c0e6
+FROM ubuntu:25.10@sha256:7cc5e35f6567ee8c66d2abb4aab0fd866669e6207c237c3a8f0947a5c7f17092
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Pins. Every download below is checked against a SHA-256: from the publisher's SHA256SUMS
