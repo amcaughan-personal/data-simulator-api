@@ -1,0 +1,7 @@
+name: zz-probe
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  probe:
+    uses: amcaughan-personal/shared_workflows/.github/workflows/zz-context-probe.yml@91dffafb6959ba403097f650a70bd4c0503217ad
