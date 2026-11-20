@@ -2,7 +2,7 @@
 
 Describe the kinds of things in your data and how each column is distributed; get realistic synthetic rows back.
 
-**Try it:** https://d1dfbd1pkurhz5.cloudfront.net/docs, the interactive docs with runnable examples.
+**Try it:** https://d1dfbd1pkurhz5.cloudfront.net/docs, the interactive docs with runnable examples. A static copy of the API reference is also on [GitHub Pages](https://amcaughan-personal.github.io/data-simulator-api/), so it stays up even if the API is down.
 
 ```bash
 curl -X POST https://d1dfbd1pkurhz5.cloudfront.net/v1/datasets \

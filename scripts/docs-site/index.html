@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Simulator API reference</title>
+  <!-- Pinned version, with integrity hashes so a changed file is refused. -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1/swagger-ui.css"
+        integrity="sha384-4c3vsE5f+trhFyHrFrLM1fFGUn531NIaC7dcqEWIJdoRQJ5CkJbSuSCwXLpaS1KF"
+        crossorigin="anonymous">
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    .banner { padding: 12px 20px; background: #1b1f23; color: #e6edf3; font-size: 14px; }
+    .banner a { color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    Static copy of the API reference, published from
+    <a href="https://github.com/amcaughan-personal/data-simulator-api">GitHub</a>.
+    “Try it out” calls the live API. Guides and examples are in the
+    <a href="https://github.com/amcaughan-personal/data-simulator-api/tree/main/docs">docs</a>.
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1/swagger-ui-bundle.js"
+          integrity="sha384-XFYN47VzPiDY6qPtxYKg0nqUeW/upo20xf1j2SUE7gT/i35FJB4cuS/71Iegzk8Z"
+          crossorigin="anonymous"></script>
+  <script>
+    SwaggerUIBundle({ url: "openapi.json", dom_id: "#swagger-ui", deepLinking: true });
+  </script>
+</body>
+</html>
