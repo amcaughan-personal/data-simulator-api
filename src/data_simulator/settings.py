@@ -10,6 +10,7 @@ from dataclasses import dataclass
 class Settings:
     max_cells: int
     root_path: str
+    origin_secret: str | None = None
 
 
 def load_settings() -> Settings:
@@ -19,4 +20,7 @@ def load_settings() -> Settings:
         max_cells=int(os.environ.get("DATA_SIMULATOR_MAX_CELLS", "100000")),
         # Path prefix when served behind an API Gateway stage, so /docs links resolve.
         root_path=os.environ.get("DATA_SIMULATOR_ROOT_PATH", ""),
+        # Set in AWS: requests must carry this in the X-Origin-Verify header, which only
+        # CloudFront adds, so calling the function URL directly gets nowhere. Unset locally.
+        origin_secret=os.environ.get("DATA_SIMULATOR_ORIGIN_SECRET") or None,
     )

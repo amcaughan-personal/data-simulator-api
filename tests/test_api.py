@@ -53,6 +53,13 @@ def test_bad_requests_return_422_with_a_reason(client):
     assert too_big.status_code == 422 and "the limit is 10,000" in too_big.text
 
 
+def test_origin_secret_required_when_configured():
+    guarded = TestClient(create_app(Settings(max_cells=10_000, root_path="", origin_secret="s3cret")))
+    assert guarded.get("/health").status_code == 403
+    assert guarded.get("/health", headers={"X-Origin-Verify": "wrong"}).status_code == 403
+    assert guarded.get("/health", headers={"X-Origin-Verify": "s3cret"}).json() == {"status": "ok"}
+
+
 def test_lambda_handler_serves_api_gateway_events():
     from data_simulator.lambda_handler import handler
 
