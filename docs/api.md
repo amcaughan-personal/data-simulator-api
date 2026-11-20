@@ -114,6 +114,24 @@ The stream spec is a dataset spec with a different `rows`:
 
 The response is a dataset response plus `start` and `window`. CSV works the same way.
 
+## Simple data of a given shape
+
+To test a pipeline without designing a data model, ask for a shape:
+
+```bash
+curl "https://d1dfbd1pkurhz5.cloudfront.net/v1/datasets/simple?rows=4&columns=4&seed=1" -H "Accept: text/csv"
+```
+
+```csv
+id,number_1,count_1,category_1
+1,110.3,8,c
+2,112.43,4,b
+3,119.99,3,d
+4,100.33,8,d
+```
+
+`id` comes first; the other columns cycle through a decimal, a whole number and a category, so every common type appears. `rows` defaults to 100, `columns` (including `id`) to 5, and `seed` is optional. It's a `GET` because the input is just three numbers.
+
 ## Response format and CSV
 
 JSON responses carry the data plus what's needed to reproduce it:
