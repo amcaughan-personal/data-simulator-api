@@ -84,7 +84,7 @@ SENSOR_FLEET: dict[str, Any] = {
             "columns": {
                 "temperature_c": {
                     "constant": 21,
-                    "add": "calibration_offset",
+                    "add_column": "calibration_offset",
                     "noise": {"random_walk": {"step": 0.1}},
                     "round": 2,
                 }
@@ -95,7 +95,7 @@ SENSOR_FLEET: dict[str, Any] = {
             "columns": {
                 "temperature_c": {
                     "constant": 12,
-                    "add": "calibration_offset",
+                    "add_column": "calibration_offset",
                     "seasonality": [{"period": "1d", "amplitude": 5, "peak": "15h"}],
                     "noise": {"normal": {"stddev": 0.5}},
                     "round": 2,

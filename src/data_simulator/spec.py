@@ -168,10 +168,12 @@ class ColumnSpec(_Model):
     per: Name | None = Field(None, description="Fix the value per individual, e.g. 'id'.")
     trend: Trend | None = Field(None, description="Needs rows with timestamps.")
     seasonality: list[Cycle] = Field(default_factory=list, description="Needs rows with timestamps.")
-    multiply_by: Dependency | None = Field(
+    multiply_column: Dependency | None = Field(
         None, description="An earlier numeric column, or a category lookup."
     )
-    add: Dependency | None = Field(None, description="An earlier numeric column, or a category lookup.")
+    add_column: Dependency | None = Field(
+        None, description="An earlier numeric column, or a category lookup."
+    )
     noise: Noise | None = None
     min: float | None = None
     max: float | None = None
@@ -181,15 +183,19 @@ class ColumnSpec(_Model):
     @model_validator(mode="after")
     def _check(self) -> ColumnSpec:
         kind = _exactly_one(self, COLUMN_KINDS, "a column")
-        numeric_only = ("trend", "multiply_by", "add", "noise", "min", "max", "round")
+        numeric_only = ("trend", "multiply_column", "add_column", "noise", "min", "max", "round")
         if kind in OTHER_KINDS or (kind == "constant" and not _is_number(self.constant)):
             used = [key for key in numeric_only if key in self.model_fields_set]
             if self.seasonality:
                 used.append("seasonality")
             if used:
                 raise ValueError(f"{', '.join(used)} only apply to numeric columns, not {kind}")
-        if self.per is not None and ({"trend", "multiply_by", "add", "noise"} & self.model_fields_set):
-            raise ValueError("a column fixed with 'per' can't also use trend, multiply_by, add or noise")
+        if self.per is not None and (
+            {"trend", "multiply_column", "add_column", "noise"} & self.model_fields_set
+        ):
+            raise ValueError(
+                "a column fixed with 'per' can't also use trend, multiply_column, add_column or noise"
+            )
         if self.min is not None and self.max is not None and self.max < self.min:
             raise ValueError("max must be >= min")
         if isinstance(self.categorical, dict):
@@ -214,7 +220,7 @@ class ColumnSpec(_Model):
     @property
     def dependencies(self) -> list[str]:
         refs: list[str] = []
-        for dependency in (self.multiply_by, self.add):
+        for dependency in (self.multiply_column, self.add_column):
             if isinstance(dependency, str):
                 refs.append(dependency)
             elif isinstance(dependency, dict):

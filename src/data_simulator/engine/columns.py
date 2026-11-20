@@ -26,10 +26,10 @@ def column_values(
     if frame is not None:
         if spec.uses_time:
             values = _add_time_patterns(values, spec, frame.timestamps[rows], frame.time_origin)
-        if spec.multiply_by is not None:
-            values = values * _dependency(spec.multiply_by, frame, rows, neutral=1.0)
-        if spec.add is not None:
-            values = values + _dependency(spec.add, frame, rows, neutral=0.0)
+        if spec.multiply_column is not None:
+            values = values * _dependency(spec.multiply_column, frame, rows, neutral=1.0)
+        if spec.add_column is not None:
+            values = values + _dependency(spec.add_column, frame, rows, neutral=0.0)
         if spec.noise is not None:
             values = _add_noise(values, spec, frame.series[rows], rng)
 
@@ -46,7 +46,10 @@ def is_integer(spec: ColumnSpec) -> bool:
     if spec.noise is not None and spec.noise.poisson:
         return True
     adjusted = (
-        spec.uses_time or spec.multiply_by is not None or spec.add is not None or spec.noise is not None
+        spec.uses_time
+        or spec.multiply_column is not None
+        or spec.add_column is not None
+        or spec.noise is not None
     )
     if spec.kind == "poisson":
         return not adjusted and spec.round is None

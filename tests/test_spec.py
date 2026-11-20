@@ -56,8 +56,15 @@ def test_row_shapes(rows, expected):
             "add up to 1",
         ),
         (
-            {"rows": {"count": 5}, "common_columns": {"y": {"normal": {}, "add": "x"}, "x": {"normal": {}}}},
+            {
+                "rows": {"count": 5},
+                "common_columns": {"y": {"normal": {}, "add_column": "x"}, "x": {"normal": {}}},
+            },
             "must be an earlier column",
+        ),
+        (
+            {"rows": {"count": 5}, "common_columns": {"x": {"normal": {}, "add_column": "x"}}},
+            "earlier column",
         ),
     ],
 )

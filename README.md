@@ -88,10 +88,12 @@ Optional adjustments, applied in this order:
 | `"per": "id"` | one value per individual (e.g. each sensor's calibration offset) |
 | `"trend": {"growth": 0.01, "per": "1d"}` | grows 1% a day; `{"linear": 5, "per": "1d"}` adds 5 a day |
 | `"seasonality": [{"period": "1d", "amplitude": 400, "peak": "14h"}]` | daily cycle peaking at 2pm (UTC) |
-| `"multiply_by"` / `"add"` | an earlier column: `"offset"`, or a lookup like `{"region": {"west": 1.2}}` |
+| `"multiply_column"` / `"add_column"` | multiply by (or add) an earlier column: `"offset"`, or a value looked up from one: `{"region": {"west": 1.2}}` |
 | `"noise": {"normal": {"stddev": 5}}` | also `uniform`, `random_walk`, or `{"poisson": true}` for counts |
 | `"min"`, `"max"`, `"round"` | clip and round |
 | `"missing": 0.05` | leave 5% of values empty |
+
+`multiply_column` and `add_column` can only reference columns listed earlier (common columns come first), so reference loops are impossible.
 
 ## Run it locally
 

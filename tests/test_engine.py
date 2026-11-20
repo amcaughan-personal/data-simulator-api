@@ -96,8 +96,8 @@ def test_columns_can_depend_on_earlier_columns():
         "common_columns": {
             "tier": {"categorical": ["standard", "premium"]},
             "x": {"sequence": {}},
-            "by_tier": {"constant": 100, "multiply_by": {"tier": {"premium": 2}}},
-            "plus_x": {"constant": 10, "add": "x"},
+            "by_tier": {"constant": 100, "multiply_column": {"tier": {"premium": 2}}},
+            "plus_x": {"constant": 10, "add_column": "x"},
         },
     }
     dataset = run(raw)
