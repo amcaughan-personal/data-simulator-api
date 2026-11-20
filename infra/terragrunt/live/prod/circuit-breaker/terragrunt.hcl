@@ -2,6 +2,10 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
+locals {
+  env = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
+}
+
 terraform {
   source = "${get_repo_root()}/infra/terragrunt/modules/circuit-breaker"
 }
@@ -17,10 +21,10 @@ dependency "api_function" {
 }
 
 inputs = {
-  name                 = "data-simulator-api-circuit-breaker"
+  name                 = "${local.env.name}-circuit-breaker"
   target_function_name = dependency.api_function.outputs.function_name
   target_function_arn  = dependency.api_function.outputs.function_arn
 
-  max_invocations_per_5_minutes = 1000
-  max_invocations_per_day       = 20000
+  max_invocations_per_5_minutes = local.env.max_invocations_per_5_minutes
+  max_invocations_per_day       = local.env.max_invocations_per_day
 }

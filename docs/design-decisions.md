@@ -12,8 +12,10 @@ Why the API is built the way it is, and what each choice gives up.
 - [CloudFront in front, not API Gateway (for now)](#cloudfront-in-front-not-api-gateway-for-now)
 - [An origin secret instead of IAM auth on the function URL](#an-origin-secret-instead-of-iam-auth-on-the-function-url)
 - [A circuit breaker that needs a human to reset](#a-circuit-breaker-that-needs-a-human-to-reset)
+- [Staging, versions and a canary](#staging-versions-and-a-canary)
+- [CI ships code; people apply infrastructure](#ci-ships-code-people-apply-infrastructure)
 - [No API keys](#no-api-keys)
-- [One environment](#one-environment)
+- [Staging, but no dev environment](#staging-but-no-dev-environment)
 - [Small, reproducible build](#small-reproducible-build)
 - [Tests cover behaviour, not lines](#tests-cover-behaviour-not-lines)
 - [Security-scan exceptions live next to the code](#security-scan-exceptions-live-next-to-the-code)
@@ -99,17 +101,45 @@ The exception is `GET /v1/datasets/simple`, whose input is just a few numbers.
 
 **Trade-off:** a genuine traffic spike also takes the API offline until someone resets it. For a demo that's the right way round.
 
+## Staging, versions and a canary
+
+**Decision:** two identical environments (the same stacks, with a per-environment
+`env.hcl`). Each deploy publishes an immutable Lambda version, and CodeDeploy moves a `live`
+alias to it: all at once in staging, and as a 10%-for-5-minutes canary in production that
+rolls back if the alias's error alarm fires. Production also waits for an approval.
+
+**Why:** it's the standard way to ship a service safely, at no real cost: staging's
+CloudFront is on its own Free plan, and idle Lambda costs nothing. CodeDeploy's built-in
+Lambda canary is free and replaces what would otherwise be hand-written traffic-shifting
+scripts. The approval lives in GitHub's environment settings, so dropping it (pure CI/CD)
+is a one-line change in personal_infra, with no workflow change.
+
+**Trade-off:** more moving parts than "terraform apply", and a merge takes about ten
+minutes to reach production. Configuration changes take effect with the next deploy,
+because a version keeps the configuration it was published with.
+
+## CI ships code; people apply infrastructure
+
+**Decision:** the deploy workflow can upload code and move the alias for one function. It
+can't run Terraform. Infrastructure is still applied by hand after reviewing the plan.
+
+**Why:** a role that can apply Terraform can grant itself anything, so it would need much
+stronger protection. Code deploys are frequent and low-risk; infrastructure changes are
+rare and worth a human read. The deploy roles live in this repo, which is fine *because*
+applies are manual: a PR can't widen a role without someone applying it. If CI ever
+applies this repo's Terraform, the roles should move to personal_infra.
+
 ## No API keys
 
 **Decision:** the API is open, with no keys.
 
 **Why:** a key published in the README for anyone to try protects nothing, and per-key quotas were an API Gateway feature. Per-IP rate limits, the concurrency cap and the cost bounds do that job.
 
-## One environment
+## Staging, but no dev environment
 
-**Decision:** one deployed environment (`live/prod`), with development done locally (`uvicorn`, `pytest`).
+**Decision:** two deployed environments, staging and production (see [above](#staging-versions-and-a-canary)). Development happens locally (`uvicorn`, `pytest`), not in a cloud dev environment.
 
-**Why:** for a small public demo, a second cloud environment would double the infrastructure without catching anything the local setup and CI don't. Splitting stacks by role (function and front door) rather than by environment turned out to be the more useful seam.
+**Why:** staging earns its place by testing the real deploy path (the package, the alias, CodeDeploy and the front door) before production sees it. A per-developer cloud environment wouldn't catch anything local runs and CI don't. Stacks are split both by role (function, front door, circuit breaker, deployment) and by environment, with an `env.hcl` holding the only differences.
 
 ## Small, reproducible build
 

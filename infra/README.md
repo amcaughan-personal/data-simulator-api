@@ -10,21 +10,20 @@ terragrunt/
     api-function/               Lambda + function URL + log group + least-privilege role
     front-door/cloudfront/      CloudFront + WAF on the CloudFront Free flat-rate plan
     circuit-breaker/            alarms + a Lambda that stops the function if it's overused
-  live/prod/
-    api-function/               the deployed function
-    front-door/                 the public entry point (uses api-function's outputs)
-    circuit-breaker/            watches api-function; re-apply api-function to reset it
+    deployment/                 CodeDeploy (canary + rollback) and the role CI deploys as
+  live/
+    prod/                       production; env.hcl holds its names and limits
+      api-function/             the function and its live alias
+      front-door/               the public entry point (uses api-function's outputs)
+      circuit-breaker/          watches api-function; re-apply api-function to reset it
+      deployment/               how code reaches the live alias
+    staging/                    the same stacks, with staging's env.hcl
 ```
 
 The function only answers requests carrying the origin secret, which only the front door
 sends. To try a different front door (e.g. API Gateway), add a module under
 `modules/front-door/` that takes the same inputs (`origin_domain`, `origin_secret`) and
-point `live/prod/front-door` at it.
+point each environment's `front-door` stack at it.
 
-Deploy:
-
-```bash
-./scripts/build-lambda.sh                       # dist/lambda.zip
-cd infra/terragrunt/live/prod/api-function && terragrunt apply
-cd ../front-door && terragrunt apply              # only when the front door changes
-```
+Code is deployed by the deploy workflow (staging, then a production canary); this tree is
+for infrastructure changes, applied staging first. See [docs/aws.md](../docs/aws.md).
