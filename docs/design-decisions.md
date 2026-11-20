@@ -4,6 +4,9 @@ Why the API is built the way it is, and what each choice gives up.
 
 - [The spec is organised around profiles](#the-spec-is-organised-around-profiles)
 - [Statistical vocabulary, simple mechanics](#statistical-vocabulary-simple-mechanics)
+- [Streams get their own endpoint](#streams-get-their-own-endpoint)
+- [Streams are cut into fixed buckets](#streams-are-cut-into-fixed-buckets)
+- [POST, even for reads](#post-even-for-reads)
 - [Validate everything up front; never execute input](#validate-everything-up-front-never-execute-input)
 - [Limit responses by cells, not rows](#limit-responses-by-cells-not-rows)
 - [CloudFront in front, not API Gateway (for now)](#cloudfront-in-front-not-api-gateway-for-now)
@@ -33,6 +36,26 @@ Why the API is built the way it is, and what each choice gives up.
 - a column can only reference columns *above* it, so reference loops can't exist
 
 **Trade-off:** some features were cut to keep this readable: scoped mutation rules, per-entity drift, template columns.
+
+## Streams get their own endpoint
+
+**Decision:** `POST /v1/datasets` returns a complete dataset; `POST /v1/streams/window` returns a window of an endless stream. They share profiles, columns and validation, but have separate request models.
+
+**Why:** they promise different things. A dataset is finite and fully defined by its spec. A stream is pulled repeatedly, and every window must agree with every other, so the spec describes the stream and the window is a separate, per-call parameter. Separate models make each one validate exactly what applies (`count` on a stream is an error) and keep the docs precise. Shapes of data (records, events, series per individual) stay options of `rows`, because they combine; separate endpoints for them would duplicate everything else.
+
+## Streams are cut into fixed buckets
+
+**Decision:** a stream is divided into time buckets counted from its `start`. Each bucket is generated from the seed and the bucket's number, never from the window asked for; a window generates the buckets it touches and keeps the rows inside it. Bucket sizes come from the spec (about 1,000 rows each).
+
+**Why:** that is what makes any two windows consistent, whatever their boundaries, and it's directly testable (the tests check that three arbitrary windows join up into the whole). Values fixed per individual use the stream seed rather than the bucket's, so they agree across windows. Row numbers count every earlier bucket's rows; bucket sizes are drawn 1,024 at a time, so even ten years in this takes a fraction of a second.
+
+**Trade-off:** `random_walk` noise is not supported in streams, since a value would depend on every step since the start.
+
+## POST, even for reads
+
+**Decision:** both endpoints are `POST`, although they only read: nothing is stored, and the same request gives the same response.
+
+**Why:** the spec is structured JSON of up to 64 KB. `GET` has no standard request body (CloudFront and many clients drop it), and squeezing specs into query strings would be unreadable and hit URL length limits. This is the usual choice for query-style APIs (Elasticsearch's search, GraphQL).
 
 ## Validate everything up front; never execute input
 

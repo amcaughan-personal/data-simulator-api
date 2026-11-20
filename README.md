@@ -16,13 +16,15 @@ curl -X POST https://d1dfbd1pkurhz5.cloudfront.net/v1/datasets \
  "rows": [{"region": "south", "orders": 5}, {"region": "north", "orders": 4}, {"region": "north", "orders": 3}]}
 ```
 
+Need a feed rather than a one-off table? `POST /v1/streams/window` treats a spec as an endless stream: fetch any time window, and consecutive windows join up exactly, so ELT jobs and dbt models can pull it hour by hour.
+
 Datasets can mix several kinds of things (standard and premium cards, indoor and outdoor sensors), follow trends and daily or weekly cycles, include labelled anomalies, and come back as JSON or CSV. The same spec and seed always give the same data.
 
 ## Documentation
 
 | Page | What's in it |
 |---|---|
-| [Using the API](docs/api.md) | The spec and every option, CSV, limits and errors |
+| [Using the API](docs/api.md) | The spec and every option, streams, CSV, limits and errors |
 | [Examples](docs/examples.md) | Complete specs and the data they produce |
 | [AWS architecture](docs/aws.md) | How it runs: CloudFront, WAF, Lambda, Terraform layout, cost controls, deploying |
 | [Design decisions](docs/design-decisions.md) | Why it's built this way, and what was traded off |

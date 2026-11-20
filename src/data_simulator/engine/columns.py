@@ -19,7 +19,8 @@ def column_values(
     `frame` is None when drawing one value per individual (columns with `per`), in which
     case only the distribution, min/max and rounding apply.
     """
-    values = _base(spec, rows, rng)
+    numbers = rows if frame is None or frame.row_numbers is None else frame.row_numbers[rows]
+    values = _base(spec, numbers, rng)
     if not spec.is_numeric:
         return values
 
@@ -57,6 +58,7 @@ def is_integer(spec: ColumnSpec) -> bool:
 
 
 def _base(spec: ColumnSpec, rows: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """`rows` are row numbers: used by `sequence`, and for how many values to draw."""
     n = len(rows)
     match spec.kind:
         case "normal":

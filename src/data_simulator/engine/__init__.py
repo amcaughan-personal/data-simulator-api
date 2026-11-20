@@ -4,6 +4,9 @@
 2. Generate columns in order (common columns, then profile columns), so a column can
    depend on earlier ones. Each profile's rows use that profile's definition (`columns.py`).
 3. Convert to JSON-ready rows (`output.py`).
+
+Streams (`stream.py`) lay out rows in fixed time buckets instead, then run the same steps
+2 and 3 on each bucket.
 """
 
 from __future__ import annotations
@@ -16,10 +19,11 @@ from data_simulator.engine.columns import column_values, is_integer
 from data_simulator.engine.frame import Frame, GenerationError
 from data_simulator.engine.output import to_rows
 from data_simulator.engine.rows import layout_rows
+from data_simulator.engine.stream import stream_layouts
 from data_simulator.rng import new_seed, rng_for
-from data_simulator.spec import Anomaly, ColumnSpec, DatasetSpec
+from data_simulator.spec import Anomaly, ColumnSpec, DatasetSpec, StreamSpec, Window, _TableSpec
 
-__all__ = ["GenerationError", "generate"]
+__all__ = ["GenerationError", "generate", "generate_window"]
 
 
 def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
@@ -32,7 +36,55 @@ def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
 
     seed = spec.seed if spec.seed is not None else new_seed()
     frame = layout_rows(spec, seed)
+    _fill_columns(spec, frame)
 
+    return {
+        "name": spec.name,
+        "description": spec.description,
+        "seed": seed,
+        "row_count": frame.n,
+        "columns": spec.output_columns,
+        "rows": to_rows(frame, spec.output_columns),
+    }
+
+
+def generate_window(spec: StreamSpec, window: Window, max_cells: int | None = None) -> dict[str, Any]:
+    names = spec.output_columns
+    layouts, row_count = [], 0
+    for frame, keep in stream_layouts(spec, window.from_, window.to):
+        row_count += int(keep.sum())
+        if max_cells is not None and row_count * len(names) > max_cells:
+            raise GenerationError(
+                f"window has more than {max_cells // len(names):,} rows ({len(names)} columns, "
+                f"limit {max_cells:,} cells); ask for a shorter window"
+            )
+        if keep.any():
+            layouts.append((frame, keep))
+
+    rows: list[dict[str, Any]] = []
+    for frame, keep in layouts:
+        _fill_columns(spec, frame)
+        frame.columns = {name: values[keep] for name, values in frame.columns.items()}
+        rows.extend(to_rows(frame, names))
+
+    return {
+        "name": spec.name,
+        "description": spec.description,
+        "seed": spec.seed,
+        "start": _iso(spec.start),
+        "window": {"from": _iso(window.from_), "to": _iso(window.to)},
+        "row_count": len(rows),
+        "columns": names,
+        "rows": rows,
+    }
+
+
+def _iso(value) -> str:
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _fill_columns(spec: _TableSpec, frame: Frame) -> None:
+    """Add the generated columns (timestamp, id, profile), then every defined column."""
     if frame.timestamps is not None:
         frame.columns[spec.rows.timestamp_column] = frame.timestamps
     if frame.individual is not None:
@@ -53,18 +105,9 @@ def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
 
     if frame.anomaly_labels is not None:
         frame.columns[spec.anomaly_column] = frame.anomaly_labels
-    names = spec.output_columns
-    return {
-        "name": spec.name,
-        "description": spec.description,
-        "seed": seed,
-        "row_count": frame.n,
-        "columns": names,
-        "rows": to_rows(frame, names),
-    }
 
 
-def _generate_column(name: str, spec: DatasetSpec, frame: Frame) -> np.ndarray:
+def _generate_column(name: str, spec: _TableSpec, frame: Frame) -> np.ndarray:
     groups = _groups(name, spec, frame)
     defined = [column for column, _, _ in groups if column is not None]
     numeric = all(column.is_numeric for column in defined)
@@ -75,7 +118,8 @@ def _generate_column(name: str, spec: DatasetSpec, frame: Frame) -> np.ndarray:
     for column, rows, key in groups:
         if column is None or len(rows) == 0:
             continue
-        rng = rng_for(frame.seed, "column", name, key)
+        # Values fixed per individual must match across stream buckets, so use the fixed seed.
+        rng = rng_for(frame.fixed_seed if column.per else frame.seed, "column", name, key)
         values = (
             _per_individual(column, rows, key, frame, rng)
             if column.per
@@ -97,7 +141,7 @@ def _generate_column(name: str, spec: DatasetSpec, frame: Frame) -> np.ndarray:
     return result
 
 
-def _groups(name: str, spec: DatasetSpec, frame: Frame) -> list[tuple[ColumnSpec | None, np.ndarray, str]]:
+def _groups(name: str, spec: _TableSpec, frame: Frame) -> list[tuple[ColumnSpec | None, np.ndarray, str]]:
     """(definition, rows it applies to, seed key): one group for a common column, else one per profile."""
     if name in spec.common_columns:
         return [(spec.common_columns[name], np.arange(frame.n), "common")]

@@ -12,10 +12,10 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 from data_simulator.api.csv_output import to_csv, wants_csv
-from data_simulator.api.examples import DATASET_EXAMPLES
-from data_simulator.engine import GenerationError, generate
+from data_simulator.api.examples import DATASET_EXAMPLES, STREAM_EXAMPLES
+from data_simulator.engine import GenerationError, generate, generate_window
 from data_simulator.settings import Settings, load_settings
-from data_simulator.spec import DatasetSpec
+from data_simulator.spec import DatasetSpec, StreamWindowRequest
 
 DESCRIPTION = """
 Describe a dataset in a few lines of JSON and get realistic synthetic rows back.
@@ -26,7 +26,13 @@ Describe a dataset in a few lines of JSON and get realistic synthetic rows back.
   and get noise and missing values.
 - **Seeded**: the same spec and seed always return the same data.
 
-Open `POST /v1/datasets`, choose an example and press *Try it out*.
+Two endpoints:
+
+- `POST /v1/datasets` returns one complete dataset.
+- `POST /v1/streams/window` returns one time window of an endless stream. Every window
+  is consistent with every other, so a pipeline can fetch hour after hour.
+
+Open either, choose an example and press *Try it out*.
 Send `Accept: text/csv` to get CSV instead of JSON.
 """
 
@@ -38,6 +44,11 @@ class Dataset(BaseModel):
     row_count: int
     columns: list[str]
     rows: list[dict[str, Any]]
+
+
+class StreamWindow(Dataset):
+    start: str
+    window: dict[str, str]
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -108,21 +119,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             dataset = generate(spec, max_cells=settings.max_cells)
         except GenerationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        return _csv_response(dataset) if wants_csv(accept) else Dataset(**dataset)
 
-        if wants_csv(accept):
-            # CSV has nowhere to put metadata, so the seed and row count travel as headers.
-            return Response(
-                content=to_csv(dataset),
-                media_type="text/csv",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{dataset["name"]}.csv"',
-                    "X-Seed": str(dataset["seed"]),
-                    "X-Row-Count": str(dataset["row_count"]),
-                },
-            )
-        return Dataset(**dataset)
+    @app.post(
+        "/v1/streams/window",
+        tags=["streams"],
+        summary="Get one time window of an endless stream",
+        responses={
+            200: {"content": {"text/csv": {}}, "description": "JSON by default; CSV with Accept: text/csv"}
+        },
+    )
+    def stream_window(
+        request: Annotated[StreamWindowRequest, Body(openapi_examples=STREAM_EXAMPLES)],
+        accept: Annotated[str, Header()] = "application/json",
+    ) -> StreamWindow:
+        """Same stream and seed, same rows: windows join up exactly, and individuals keep
+        their fixed values across windows."""
+        try:
+            window = generate_window(request.stream, request.window, max_cells=settings.max_cells)
+        except GenerationError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return _csv_response(window) if wants_csv(accept) else StreamWindow(**window)
 
     return app
+
+
+def _csv_response(data: dict[str, Any]) -> Response:
+    # CSV has nowhere to put metadata, so the seed and row count travel as headers.
+    return Response(
+        content=to_csv(data),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{data["name"]}.csv"',
+            "X-Seed": str(data["seed"]),
+            "X-Row-Count": str(data["row_count"]),
+        },
+    )
 
 
 app = create_app()

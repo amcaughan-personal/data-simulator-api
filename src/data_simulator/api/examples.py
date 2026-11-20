@@ -143,3 +143,69 @@ DATASET_EXAMPLES: dict[str, Example] = {
     "sensor_fleet": Example(summary="Hourly time series per sensor", value=SENSOR_FLEET),
     "web_traffic": Example(summary="One time series with trend and cycles", value=WEB_TRAFFIC),
 }
+
+
+# Streams: the spec describes the stream; each request asks for one window of it.
+CARD_STREAM: dict[str, Any] = {
+    "name": "card_transactions",
+    "description": "An endless stream of card transactions, about 120 an hour.",
+    "seed": 7,
+    "rows": {"rate": 120, "per": "1h", "from": {"standard_card": 0.8, "premium_card": 0.2}},
+    "profiles": {
+        "standard_card": {
+            "count": 200,
+            "columns": {
+                "credit_limit": {"constant": 2000, "per": "id"},
+                "amount": {"lognormal": {"median": 35, "sigma": 0.8}, "round": 2},
+            },
+        },
+        "premium_card": {
+            "count": 40,
+            "columns": {
+                "credit_limit": {"uniform": {"low": 5000, "high": 20000}, "per": "id", "round": 0},
+                "amount": {"lognormal": {"median": 60, "sigma": 0.6}, "round": 2},
+            },
+        },
+    },
+    "common_columns": {"transaction_id": {"sequence": {}}},
+}
+
+SENSOR_STREAM: dict[str, Any] = {
+    "name": "sensor_readings",
+    "description": "Every sensor reports every 15 minutes, with a daily cycle and per-sensor offsets.",
+    "seed": 3,
+    "rows": {"every": "15m", "one_each": True},
+    "profiles": {
+        "sensor": {
+            "count": 4,
+            "columns": {
+                "calibration_offset": {"normal": {"stddev": 0.8}, "per": "id", "round": 2},
+                "temperature_c": {
+                    "constant": 21,
+                    "seasonality": [{"period": "1d", "amplitude": 2.5, "peak": "15h"}],
+                    "add_column": "calibration_offset",
+                    "noise": {"normal": {"stddev": 0.3}},
+                    "round": 2,
+                },
+            },
+        }
+    },
+    "common_columns": {"reading_id": {"sequence": {}}},
+}
+
+STREAM_EXAMPLES: dict[str, Example] = {
+    "card_transactions": Example(
+        summary="Events at random times: one hour of a card stream",
+        value={
+            "stream": CARD_STREAM,
+            "window": {"from": "2026-03-01T09:00:00Z", "to": "2026-03-01T10:00:00Z"},
+        },
+    ),
+    "sensor_readings": Example(
+        summary="A series per sensor: two hours of readings",
+        value={
+            "stream": SENSOR_STREAM,
+            "window": {"from": "2026-03-01T09:00:00Z", "to": "2026-03-01T11:00:00Z"},
+        },
+    ),
+}

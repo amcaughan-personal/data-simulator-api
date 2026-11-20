@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from data_simulator.api.app import create_app
 from data_simulator.api.csv_output import wants_csv
-from data_simulator.api.examples import DATASET_EXAMPLES
+from data_simulator.api.examples import DATASET_EXAMPLES, STREAM_EXAMPLES
 from data_simulator.settings import Settings
 
 
@@ -109,3 +109,17 @@ def test_lambda_handler_serves_api_gateway_events():
     }
     response = handler(event, None)
     assert response["statusCode"] == 200 and '"ok"' in response["body"]
+
+
+@pytest.mark.parametrize("name", list(STREAM_EXAMPLES))
+def test_stream_examples_work(client, name):
+    response = client.post("/v1/streams/window", json=STREAM_EXAMPLES[name]["value"])
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["row_count"] == len(body["rows"]) > 0
+    assert body["window"] == STREAM_EXAMPLES[name]["value"]["window"]
+
+    csv = client.post(
+        "/v1/streams/window", json=STREAM_EXAMPLES[name]["value"], headers={"Accept": "text/csv"}
+    )
+    assert csv.headers["x-row-count"] == str(body["row_count"])
