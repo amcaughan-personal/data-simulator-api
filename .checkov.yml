@@ -1,16 +1,7 @@
+# Repo-wide decisions only. Anything about a specific resource is skipped inline, next
+# to that resource, with a "#checkov:skip=CHECK:reason" comment, so the same check still
+# applies to any new resource.
 skip-check:
-  - CKV_GHA_7 # workflow_dispatch input is intentional for optional deep gitleaks scans
-  - CKV_AWS_338 # 1-year log retention is unnecessary for a small personal project
-  - CKV_AWS_158 # CloudWatch KMS CMK is not worth the extra key management here
-  - CKV_AWS_50 # X-Ray is optional and not needed for the Lambda MVP
-  - CKV_AWS_117 # Lambda does not need VPC placement for this account-private MVP
-  - CKV_AWS_272 # Lambda code signing adds complexity without meaningful value here
-  - CKV_AWS_173 # Default Lambda env var encryption is sufficient for this repo
-  - CKV2_AWS_73 # The DLQ already uses AWS-managed SQS encryption; a CMK is not worth the extra key management here
-  - CKV_AWS_73 # API Gateway X-Ray tracing is optional and not needed for this private MVP
-  - CKV_AWS_225 # API Gateway method caching is a poor fit for POST-heavy seeded generation responses
-  - CKV2_AWS_29 # A WAF is unnecessary for a VPC-only private API Gateway
-  - CKV_AWS_120 # API Gateway caching is not appropriate for low-volume POST-heavy synthetic generation responses
-  - CKV2_AWS_53 # Lambda proxy validation is the source of truth for varied scenario payloads; API Gateway request models would add duplicate rigid schemas
-  - CKV2_AWS_34 # The private API URL in SSM is service discovery metadata, not secret material
-  - CKV2_AWS_51 # Client certificate auth is unnecessary for a VPC-only private API consumed by internal AWS workloads
+  - CKV_GHA_7 # workflow_dispatch input is intentional (optional deep gitleaks scan)
+  - CKV_AWS_338 # Log groups: 1-year retention is unnecessary for a small personal project
+  - CKV_AWS_158 # Log groups: customer-managed KMS keys aren't worth the key management here

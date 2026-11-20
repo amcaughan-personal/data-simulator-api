@@ -1,3 +1,4 @@
+# checkov:skip=CKV_DOCKER_2:Toolbox image for running Terragrunt locally, not a long-running service
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
