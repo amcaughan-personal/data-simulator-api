@@ -8,7 +8,7 @@ from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
-from data_simulator.api.csv_output import to_csv
+from data_simulator.api.csv_output import to_csv, wants_csv
 from data_simulator.api.examples import DATASET_EXAMPLES
 from data_simulator.engine import GenerationError, generate
 from data_simulator.settings import Settings, load_settings
@@ -71,7 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except GenerationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
-        if "text/csv" in accept:
+        if wants_csv(accept):
             # CSV has nowhere to put metadata, so the seed and row count travel as headers.
             return Response(
                 content=to_csv(dataset),
