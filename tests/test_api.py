@@ -66,6 +66,20 @@ def test_non_finite_numbers_are_rejected(client):
     assert response.status_code == 422 and "overflowed" in response.text
 
 
+def test_browser_preflight_and_body_limit(client):
+    preflight = client.options(
+        "/v1/datasets",
+        headers={"Origin": "https://example.com", "Access-Control-Request-Method": "POST"},
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "*"
+
+    oversized = client.post(
+        "/v1/datasets", content=b"x" * (64 * 1024 + 1), headers={"Content-Type": "application/json"}
+    )
+    assert oversized.status_code == 413
+
+
 def test_origin_secret_required_when_configured():
     guarded = TestClient(create_app(Settings(max_cells=10_000, root_path="", origin_secret="s3cret")))
     assert guarded.get("/health").status_code == 403
