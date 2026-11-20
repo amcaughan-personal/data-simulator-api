@@ -9,11 +9,10 @@ from fastapi.openapi.models import Example
 TRANSACTIONS: dict[str, Any] = {
     "name": "transactions",
     "description": "Card transactions at random times from standard and premium cards.",
-    "seed": 42,
+    "seed": 34,
     "profiles": {
         "standard_card": {
             "count": 32,
-            "popularity": "skewed",
             "columns": {
                 "amount": {"lognormal": {"median": 35, "sigma": 0.8}, "round": 2},
                 "items": {"poisson": {"mean": 2}, "min": 1},
@@ -34,7 +33,7 @@ TRANSACTIONS: dict[str, Any] = {
     },
     "rows": {
         "count": 200,
-        "between": ["2026-03-01T00:00:00Z", "2026-03-08T00:00:00Z"],
+        "between": ["2026-03-01", "2026-03-08"],
         "from": {"standard_card": 0.8, "premium_card": 0.2},
     },
     "profile_column": "card_type",
@@ -44,7 +43,7 @@ TRANSACTIONS: dict[str, Any] = {
 INSTITUTIONS: dict[str, Any] = {
     "name": "institutions",
     "description": "One row per institution.",
-    "seed": 7,
+    "seed": 1,
     "profiles": {
         "bank": {
             "count": 12,
@@ -123,7 +122,7 @@ SENSOR_FLEET: dict[str, Any] = {
 WEB_TRAFFIC: dict[str, Any] = {
     "name": "web_traffic",
     "description": "Hourly page views for two weeks: growing 1% a day, busiest at 2pm and midweek.",
-    "seed": 11,
+    "seed": 1,
     "common_columns": {
         "page_views": {
             "constant": 1000,
