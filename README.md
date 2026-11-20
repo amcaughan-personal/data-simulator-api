@@ -46,8 +46,23 @@ Describe a dataset in a few lines of JSON, get realistic synthetic rows back.
 **Columns**: `numeric`, `categorical`, `flag` (0/1), `entity` (an ID or attribute), `sequence`, `constant`. A numeric value is:
 
 ```
-base (a constant or a distribution)  →  × / + effects from earlier columns  →  + noise  →  clip, round, gaps
+base (a constant or a distribution)  →  + trend + seasonality  →  × / + effects from earlier columns  →  + noise  →  clip, round, gaps
 ```
+
+Trend and seasonality need rows with timestamps:
+
+```json
+{
+  "name": "page_views",
+  "type": "numeric",
+  "base": 1000,
+  "trend": {"kind": "growth", "rate": 0.01, "per": "1d"},
+  "seasonality": [{"period": "1d", "amplitude": 400, "peak": "14h"}],
+  "noise": {"kind": "poisson"}
+}
+```
+
+`linear` trends add a fixed amount per period; `growth` compounds. Cycles line up with Monday 00:00 UTC, so a daily `peak` of `"14h"` is 2pm.
 
 The same spec and seed always produce the same data.
 
@@ -82,7 +97,7 @@ infra/                 Terraform/Terragrunt for AWS (being reworked)
 
 ## Status
 
-The app is being rebuilt in small steps. Next: trend and seasonality, anomalies with labels, a preset gallery, then a public deployment with cost controls.
+The app is being rebuilt in small steps. Next: anomalies with labels, a preset gallery, then a public deployment with cost controls.
 
 ## License
 

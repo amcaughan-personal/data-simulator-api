@@ -20,6 +20,7 @@ def layout_rows(spec: DatasetSpec, seed: int) -> Frame:
         # ordered by time and then by entity.
         step_index = np.arange(frame.n) // per_entity
         start = _datetime64(rows.start)
+        frame.time_origin = start
         frame.timestamps = start + step_index * _timedelta64(rows.every.total_seconds())
         if rows.one_per:
             entity_index = np.arange(frame.n) % per_entity
@@ -30,7 +31,8 @@ def layout_rows(spec: DatasetSpec, seed: int) -> Frame:
         start, end = rows.between
         span_ms = (end - start).total_seconds() * 1000
         offsets = np.sort(rng.uniform(0, span_ms, size=frame.n)).astype(np.int64)
-        frame.timestamps = _datetime64(start) + offsets.astype("timedelta64[ms]")
+        frame.time_origin = _datetime64(start)
+        frame.timestamps = frame.time_origin + offsets.astype("timedelta64[ms]")
     elif rows.one_per:
         frame.entity_rows[rows.one_per] = np.arange(frame.n)
 

@@ -89,7 +89,29 @@ SENSOR_FLEET: dict[str, Any] = {
     ],
 }
 
+WEB_TRAFFIC: dict[str, Any] = {
+    "name": "web_traffic",
+    "description": "Hourly page views for two weeks: growing 1% a day, busiest at 2pm and on weekdays.",
+    "seed": 11,
+    "rows": {"every": "1h", "count": 336, "start": "2026-03-02T00:00:00Z"},
+    "columns": [
+        {
+            "name": "page_views",
+            "type": "numeric",
+            "base": 1000,
+            "trend": {"kind": "growth", "rate": 0.01, "per": "1d"},
+            "seasonality": [
+                {"period": "1d", "amplitude": 400, "peak": "14h"},
+                {"period": "7d", "amplitude": 150, "peak": "2d"},
+            ],
+            "noise": {"kind": "poisson"},
+            "min": 0,
+        }
+    ],
+}
+
 DATASET_EXAMPLES: dict[str, Example] = {
+    "web_traffic": Example(summary="Time series with trend and daily/weekly cycles", value=WEB_TRAFFIC),
     "institutions": Example(summary="One row per institution", value=INSTITUTIONS),
     "transactions": Example(summary="Events at random times", value=TRANSACTIONS),
     "sensor_fleet": Example(summary="Hourly time series per device", value=SENSOR_FLEET),
