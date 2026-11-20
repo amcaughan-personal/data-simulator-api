@@ -24,27 +24,48 @@ def test_same_seed_gives_same_data():
 
 
 def test_adding_a_column_leaves_other_columns_unchanged():
-    extra = {"name": "x", "type": "flag", "probability": 0.5}
-    with_extra = {**TRANSACTIONS, "columns": [*TRANSACTIONS["columns"], extra]}
-    assert column(run(with_extra), "amount") == column(run(TRANSACTIONS), "amount")
+    extra = {**TRANSACTIONS, "common_columns": {**TRANSACTIONS["common_columns"], "x": {"bernoulli": 0.5}}}
+    assert column(run(extra), "amount") == column(run(TRANSACTIONS), "amount")
 
 
-def test_one_row_per_entity():
-    assert column(run(INSTITUTIONS), "institution_id") == [f"institution_{i:04d}" for i in range(1, 26)]
+def test_profiles_set_frequency_and_their_own_distributions():
+    raw = {
+        "seed": 1,
+        "rows": {"count": 10000, "from": {"standard": 0.8, "premium": 0.2}},
+        "profiles": {
+            "standard": {"columns": {"amount": {"lognormal": {"median": 35, "sigma": 0.5}}}},
+            "premium": {"columns": {"amount": {"lognormal": {"median": 60, "sigma": 0.5}}}},
+        },
+    }
+    rows = run(raw)["rows"]
+    assert Counter(r["profile"] for r in rows)["premium"] == pytest.approx(2000, rel=0.1)
+    for profile, median in [("standard", 35), ("premium", 60)]:
+        amounts = [r["amount"] for r in rows if r["profile"] == profile]
+        assert np.median(amounts) == pytest.approx(median, rel=0.05)
 
 
-def test_time_series_per_entity():
+def test_individuals_keep_their_profile_and_per_values():
+    rows = run(TRANSACTIONS)["rows"]
+    assert all(r["card_id"].startswith(r["card_type"]) for r in rows)
+
+    offsets = {(r["id"], r["calibration_offset"]) for r in run(SENSOR_FLEET)["rows"]}
+    assert len(offsets) == 5  # one fixed offset per sensor
+
+
+def test_one_row_per_individual():
+    ids = column(run(INSTITUTIONS), "id")
+    assert len(ids) == len(set(ids)) == 25
+    assert ids[:2] == ["bank_0001", "bank_0002"]
+
+
+def test_time_series_per_individual():
     rows = run(SENSOR_FLEET)["rows"]
     assert len(rows) == 24 * 5
-    assert [(r["timestamp"], r["device_id"]) for r in rows[:2]] == [
-        ("2026-01-01T00:00:00Z", "device_0001"),
-        ("2026-01-01T00:00:00Z", "device_0002"),
+    assert [(r["timestamp"], r["id"]) for r in rows[:2]] == [
+        ("2026-01-01T00:00:00Z", "indoor_0001"),
+        ("2026-01-01T00:00:00Z", "indoor_0002"),
     ]
     assert rows[-1]["timestamp"] == "2026-01-01T23:00:00Z"
-
-    # Entity attributes stay fixed for each device across all its rows.
-    offsets = {(r["device_id"], r["device_offset"]) for r in rows}
-    assert len(offsets) == 5
 
 
 def test_events_at_random_times_are_sorted_within_range():
@@ -53,76 +74,63 @@ def test_events_at_random_times_are_sorted_within_range():
     assert timestamps[0] >= "2026-03-01" and timestamps[-1] < "2026-03-08"
 
 
-def test_effects():
+def test_trend_and_seasonality():
+    raw = {
+        "rows": {"every": "1h", "count": 48},
+        "common_columns": {
+            "linear": {"constant": 100, "trend": {"linear": 10}},
+            "growth": {"constant": 100, "trend": {"growth": 0.1}},
+            "daily": {"constant": 100, "seasonality": [{"period": "1d", "amplitude": 20, "peak": "14h"}]},
+        },
+    }
+    rows = run(raw)["rows"]
+    assert rows[24]["linear"] == pytest.approx(110)  # one day in
+    assert rows[24]["growth"] == pytest.approx(110)
+    peak = max(rows[:24], key=lambda r: r["daily"])
+    assert peak["timestamp"] == "2026-01-01T14:00:00Z" and peak["daily"] == pytest.approx(120)
+
+
+def test_columns_can_depend_on_earlier_columns():
     raw = {
         "rows": {"count": 200},
-        "columns": [
-            {"name": "tier", "type": "categorical", "values": ["standard", "premium"]},
-            {"name": "x", "type": "sequence"},
-            {
-                "name": "by_tier",
-                "type": "numeric",
-                "base": 100,
-                "effects": [{"field": "tier", "values": {"premium": 2}}],
-            },
-            {"name": "plus_x", "type": "numeric", "base": 10, "effects": [{"field": "x", "op": "add"}]},
-        ],
+        "common_columns": {
+            "tier": {"categorical": ["standard", "premium"]},
+            "x": {"sequence": {}},
+            "by_tier": {"constant": 100, "multiply_column": {"tier": {"premium": 2}}},
+            "plus_x": {"constant": 10, "add_column": "x"},
+        },
     }
     dataset = run(raw)
     assert {(r["tier"], r["by_tier"]) for r in dataset["rows"]} == {("standard", 100), ("premium", 200)}
     assert column(dataset, "plus_x")[:3] == [11, 12, 13]
 
 
-def test_trend_and_seasonality():
-    raw = {
-        "rows": {"every": "1h", "count": 24 * 14},
-        "columns": [
-            {"name": "linear", "type": "numeric", "base": 100, "trend": {"kind": "linear", "change": 10}},
-            {"name": "growth", "type": "numeric", "base": 100, "trend": {"kind": "growth", "rate": 0.1}},
-            {
-                "name": "daily",
-                "type": "numeric",
-                "base": 100,
-                "seasonality": [{"period": "1d", "amplitude": 20, "peak": "14h"}],
-            },
-        ],
-    }
-    rows = run(raw)["rows"]
-    day_two = rows[24]  # 2026-01-02T00:00, one day in
-    assert day_two["linear"] == pytest.approx(110)
-    assert day_two["growth"] == pytest.approx(110)
-
-    peak = max(rows[:24], key=lambda r: r["daily"])
-    assert peak["timestamp"] == "2026-01-01T14:00:00Z" and peak["daily"] == pytest.approx(120)
-
-
 @pytest.mark.parametrize(
     ("noise", "check"),
     [
-        ({"kind": "normal", "stddev": 5}, lambda v: v.std() == pytest.approx(5, rel=0.1)),
-        ({"kind": "uniform", "width": 4}, lambda v: np.ptp(v) <= 4),
-        (
-            {"kind": "poisson"},
-            lambda v: np.all(v == np.round(v)) and v.mean() == pytest.approx(100, rel=0.05),
-        ),
+        ({"normal": {"stddev": 5}}, lambda v: v.std() == pytest.approx(5, rel=0.1)),
+        ({"uniform": {"width": 4}}, lambda v: np.ptp(v) <= 4),
+        ({"poisson": True}, lambda v: np.all(v == np.round(v)) and v.mean() == pytest.approx(100, rel=0.05)),
     ],
 )
 def test_noise(noise, check):
-    raw = {
-        "seed": 2,
-        "rows": {"count": 5000},
-        "columns": [{"name": "y", "type": "numeric", "base": 100, "noise": noise}],
-    }
+    raw = {"seed": 2, "rows": {"count": 5000}, "common_columns": {"y": {"constant": 100, "noise": noise}}}
     assert check(np.array(column(run(raw), "y")))
 
 
-def test_missing_values():
+def test_missing_and_null_columns():
     raw = {
         "seed": 8,
         "rows": {"count": 10000},
-        "columns": [{"name": "y", "type": "numeric", "missing_rate": 0.1}],
+        "profiles": {
+            "a": {"columns": {"y": {"normal": {}, "missing": 0.1}}},
+            "b": {"columns": {"y": None}},
+        },
     }
-    assert column(run(raw), "y").count(None) == pytest.approx(1000, rel=0.15)
+    rows = run(raw)["rows"]
+    a_values = [r["y"] for r in rows if r["profile"] == "a"]
+    assert a_values.count(None) == pytest.approx(len(a_values) * 0.1, rel=0.2)
+    assert all(r["y"] is None for r in rows if r["profile"] == "b")
 
 
 def test_skewed_popularity_concentrates_rows():
@@ -130,9 +138,8 @@ def test_skewed_popularity_concentrates_rows():
         raw = {
             "seed": 6,
             "rows": {"count": 5000},
-            "entities": [{"name": "user", "count": 100, "popularity": popularity}],
-            "columns": [{"name": "user_id", "type": "entity", "entity": "user"}],
+            "profiles": {"user": {"count": 100, "popularity": popularity, "columns": {"x": {"normal": {}}}}},
         }
-        return sum(n for _, n in Counter(column(run(raw), "user_id")).most_common(10)) / 5000
+        return sum(n for _, n in Counter(column(run(raw), "id")).most_common(10)) / 5000
 
     assert top_ten_share("uniform") < 0.2 < 0.4 < top_ten_share("skewed")
