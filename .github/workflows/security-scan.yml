@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   security:
-    uses: amcaughan-personal/shared_workflows/.github/workflows/security-scan.yml@0a29b714762d89b326389d92cec0024f0690f38a
+    uses: amcaughan-personal/shared_workflows/.github/workflows/security-scan.yml@48c9c6ceded2fa426ae14084a8998a263224c21e
     permissions:
       contents: read
       pull-requests: write
