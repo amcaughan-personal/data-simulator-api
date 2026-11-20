@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
+from data_simulator.api.csv_output import to_csv, wants_csv
 from data_simulator.api.examples import DATASET_EXAMPLES
 from data_simulator.engine import GenerationError, generate
 from data_simulator.settings import Settings, load_settings
@@ -23,6 +24,7 @@ Describe a dataset in a few lines of JSON and get realistic synthetic rows back.
 - **Seeded**: the same spec and seed always return the same data.
 
 Open `POST /v1/datasets`, choose an example and press *Try it out*.
+Send `Accept: text/csv` to get CSV instead of JSON.
 """
 
 
@@ -52,12 +54,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.post("/v1/datasets", tags=["datasets"], summary="Generate a dataset from a spec")
-    def create_dataset(spec: Annotated[DatasetSpec, Body(openapi_examples=DATASET_EXAMPLES)]) -> Dataset:
+    @app.post(
+        "/v1/datasets",
+        tags=["datasets"],
+        summary="Generate a dataset from a spec",
+        responses={
+            200: {"content": {"text/csv": {}}, "description": "JSON by default; CSV with Accept: text/csv"}
+        },
+    )
+    def create_dataset(
+        spec: Annotated[DatasetSpec, Body(openapi_examples=DATASET_EXAMPLES)],
+        accept: Annotated[str, Header()] = "application/json",
+    ) -> Dataset:
         try:
-            return Dataset(**generate(spec, max_cells=settings.max_cells))
+            dataset = generate(spec, max_cells=settings.max_cells)
         except GenerationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+        if wants_csv(accept):
+            # CSV has nowhere to put metadata, so the seed and row count travel as headers.
+            return Response(
+                content=to_csv(dataset),
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{dataset["name"]}.csv"',
+                    "X-Seed": str(dataset["seed"]),
+                    "X-Row-Count": str(dataset["row_count"]),
+                },
+            )
+        return Dataset(**dataset)
 
     return app
 

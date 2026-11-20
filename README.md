@@ -109,6 +109,14 @@ An anomaly changes some values (`multiply`, `add`, or `set`, where `null` emptie
 
 Anomalies apply to rows, not to individuals. For whole kinds of unusual things (say, fraudulent cards), use a rare profile instead.
 
+## CSV
+
+Send `Accept: text/csv` to get CSV instead of JSON. The seed and row count come back as `X-Seed` and `X-Row-Count` headers.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/datasets -H "Accept: text/csv" -H "Content-Type: application/json" -d @spec.json > data.csv
+```
+
 ## Limits
 
 Every response is kept small, so a tiny request can't ask for a huge table:
@@ -147,7 +155,7 @@ infra/                 Terraform/Terragrunt for AWS (being reworked)
 
 ## Status
 
-Being rebuilt in small steps. Next: CSV output, then a public deployment with cost controls.
+Being rebuilt in small steps. Next: a public deployment with cost controls.
 
 ## License
 
