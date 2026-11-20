@@ -23,7 +23,7 @@ from data_simulator.engine.stream import stream_layouts
 from data_simulator.rng import new_seed, rng_for
 from data_simulator.spec import Anomaly, ColumnSpec, DatasetSpec, StreamSpec, Window, _TableSpec
 
-__all__ = ["GenerationError", "generate", "generate_window"]
+__all__ = ["GenerationError", "column_types", "generate", "generate_window"]
 
 
 def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
@@ -44,6 +44,7 @@ def generate(spec: DatasetSpec, max_cells: int | None = None) -> dict[str, Any]:
         "seed": seed,
         "row_count": frame.n,
         "columns": spec.output_columns,
+        "types": column_types(spec),
         "rows": to_rows(frame, spec.output_columns),
     }
 
@@ -75,8 +76,32 @@ def generate_window(spec: StreamSpec, window: Window, max_cells: int | None = No
         "window": {"from": _iso(window.from_), "to": _iso(window.to)},
         "row_count": len(rows),
         "columns": names,
+        "types": column_types(spec),
         "rows": rows,
     }
+
+
+def column_types(spec: _TableSpec) -> dict[str, str]:
+    """Each output column's type: integer, number, string, boolean or timestamp.
+
+    Known from the spec alone (validation makes every profile agree), so it's the same
+    for every response and every stream window. Any value may also be null.
+    """
+    types = {spec.rows.timestamp_column: "timestamp"} if spec.rows.has_timestamps else {}
+    if spec.has_ids:
+        types[spec.id_column] = "string"
+    if spec.profiles:
+        types[spec.profile_column] = "string"
+    for name in spec.column_order:
+        defined = [column for column in spec.specs_for(name) if column is not None]
+        kinds = {column.value_type for column in defined} - {None}
+        kind = kinds.pop() if kinds else "string"
+        if kind == "number" and all(is_integer(column) for column in defined):
+            kind = "integer"
+        types[name] = kind
+    if spec.has_anomalies:
+        types[spec.anomaly_column] = "string"
+    return types
 
 
 def _iso(value) -> str:

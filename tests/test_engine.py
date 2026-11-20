@@ -172,3 +172,52 @@ def test_skewed_popularity_concentrates_rows():
         return sum(n for _, n in Counter(column(run(raw), "id")).most_common(10)) / 5000
 
     assert top_ten_share("uniform") < 0.2 < 0.4 < top_ten_share("skewed")
+
+
+def test_every_value_matches_its_declared_type():
+    checks = {
+        "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "number": lambda v: isinstance(v, int | float) and not isinstance(v, bool),
+        "string": lambda v: isinstance(v, str),
+        "boolean": lambda v: isinstance(v, bool),
+        "timestamp": lambda v: isinstance(v, str) and v.endswith("Z"),
+    }
+    raw = {
+        "seed": 1,
+        "rows": {"count": 300, "between": ["2026-01-01", "2026-01-02"]},
+        "common_columns": {
+            "flag": {"constant": True, "missing": 0.2},
+            "label": {"constant": "x"},
+            "always_empty": {"constant": None},
+        },
+    }
+    for spec in [TRANSACTIONS, INSTITUTIONS, SENSOR_FLEET, raw]:
+        dataset = run(spec)
+        assert list(dataset["types"]) == dataset["columns"]
+        for row in dataset["rows"]:
+            for name, value in row.items():
+                assert value is None or checks[dataset["types"][name]](value), (name, value)
+
+
+@pytest.mark.parametrize(
+    ("columns", "message"),
+    [
+        (
+            {"a": {"columns": {"x": {"normal": {}}}}, "b": {"columns": {"x": {"categorical": ["y"]}}}},
+            "one type",
+        ),
+        (
+            {
+                "a": {
+                    "columns": {
+                        "x": {"categorical": ["y"], "anomalies": [{"name": "n", "set": 5, "chance": 0.1}]}
+                    }
+                }
+            },
+            "string values",
+        ),
+    ],
+)
+def test_columns_keep_one_type(columns, message):
+    with pytest.raises(ValueError, match=message):
+        DatasetSpec.model_validate({"rows": {"count": 5}, "profiles": columns})

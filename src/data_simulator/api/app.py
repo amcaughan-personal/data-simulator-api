@@ -46,6 +46,7 @@ class Dataset(BaseModel):
     seed: int
     row_count: int
     columns: list[str]
+    types: dict[str, str]
     rows: list[dict[str, Any]]
 
 
@@ -169,7 +170,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 def _csv_response(data: dict[str, Any]) -> Response:
-    # CSV has nowhere to put metadata, so the seed and row count travel as headers.
+    # CSV has nowhere to put metadata, so the seed, row count and types travel as headers.
     return Response(
         content=to_csv(data),
         media_type="text/csv",
@@ -177,6 +178,7 @@ def _csv_response(data: dict[str, Any]) -> Response:
             "Content-Disposition": f'attachment; filename="{data["name"]}.csv"',
             "X-Seed": str(data["seed"]),
             "X-Row-Count": str(data["row_count"]),
+            "X-Column-Types": ",".join(f"{name}:{kind}" for name, kind in data["types"].items()),
         },
     )
 
