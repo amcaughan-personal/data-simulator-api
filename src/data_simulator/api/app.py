@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Annotated, Any
 
-from fastapi import Body, FastAPI, Header, HTTPException
-from fastapi.responses import RedirectResponse, Response
+from fastapi import Body, FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 from data_simulator.api.csv_output import to_csv, wants_csv
@@ -45,6 +46,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description=DESCRIPTION,
         root_path=settings.root_path,
     )
+
+    if settings.origin_secret:
+
+        @app.middleware("http")
+        async def require_origin_secret(request: Request, call_next):
+            supplied = request.headers.get("x-origin-verify", "")
+            if not hmac.compare_digest(supplied.encode(), settings.origin_secret.encode()):
+                return JSONResponse({"detail": "Forbidden"}, status_code=403)
+            return await call_next(request)
 
     @app.get("/", include_in_schema=False)
     def index() -> RedirectResponse:
