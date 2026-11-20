@@ -96,7 +96,8 @@ def _add_time_patterns(
         if spec.trend.linear is not None:
             values = values + spec.trend.linear * periods
         else:
-            values = values * (1 + spec.trend.growth) ** periods
+            with np.errstate(over="ignore"):  # overflow is reported as an error by the caller
+                values = values * (1 + spec.trend.growth) ** periods
 
     seconds = (timestamps - CYCLE_ANCHOR) / one_second
     for cycle in spec.seasonality:
