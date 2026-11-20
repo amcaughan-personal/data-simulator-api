@@ -81,9 +81,15 @@ The account baseline (CloudTrail, GuardDuty, budgets, the state bucket) lives in
 | Sustained heavy use | The circuit breaker stops the function after 1,000 invocations in 5 minutes or 20,000 in a day. At the daily limit, Lambda costs about $0.05 a day. |
 | Everything else | The account's monthly budget and cost anomaly alerts (personal_infra). |
 
-Measured on the live setup: a burst of 200 requests from one IP saw 38 throttled by the
-concurrency cap (`429`) and the IP blocked by WAF (`403`) about 24 seconds later. Forcing the
-burst alarm set the function's concurrency to 0 within seconds; requests then got `429`.
+In practice, a burst from one IP starts getting `429` from the concurrency cap
+straight away, and `403` from WAF within about half a minute. When the circuit breaker
+trips, every request gets `429` within seconds. To check the breaker without real
+traffic, force its alarm:
+
+```bash
+aws cloudwatch set-alarm-state --alarm-name data-simulator-api-staging-circuit-breaker-burst \
+  --state-value ALARM --state-reason "Checking the circuit breaker"
+```
 
 **Turning the API back on after the breaker trips** is deliberately manual: re-apply the
 function stack, which restores its configured concurrency.
