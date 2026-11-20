@@ -1,0 +1,13 @@
+name: python-checks
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    uses: amcaughan-personal/shared_workflows/.github/workflows/python-checks.yml@02ea5b076c080fcb315136cf3a81f53a5dbe4439
