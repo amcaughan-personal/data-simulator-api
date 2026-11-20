@@ -1,0 +1,67 @@
+name: docs-site
+
+# Publishes the API reference (Swagger UI + openapi.json) to GitHub Pages.
+# Pull requests only build it, to catch breakage; merges to main publish it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/build-docs-site.sh"
+      - "scripts/docs-site/**"
+      - ".github/workflows/docs-site.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/build-docs-site.sh"
+      - "scripts/docs-site/**"
+      - ".github/workflows/docs-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Build site
+        run: |
+          uv sync --locked
+          ./scripts/build-docs-site.sh
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5
