@@ -43,6 +43,11 @@ resource "aws_iam_role_policy" "logs" {
 }
 
 resource "aws_lambda_function" "this" {
+  #checkov:skip=CKV_AWS_116:Only invoked synchronously (via its URL), so a dead-letter queue would never receive anything
+  #checkov:skip=CKV_AWS_117:No VPC: the function calls nothing, so a VPC would add cost without isolating anything
+  #checkov:skip=CKV_AWS_50:X-Ray tracing isn't needed for a single small function
+  #checkov:skip=CKV_AWS_272:Code signing adds a signing profile and process for no real gain here
+  #checkov:skip=CKV_AWS_173:Default encryption is enough for the only env secret (the origin header value)
   function_name = var.function_name
   role          = aws_iam_role.this.arn
   runtime       = "python3.12"
@@ -71,12 +76,14 @@ resource "aws_lambda_function" "this" {
 }
 
 resource "aws_lambda_function_url" "this" {
+  #checkov:skip=CKV_AWS_258:No IAM auth by design: CloudFront can't sign POST bodies for Lambda origins without per-request-billed Lambda@Edge. The app rejects requests without the origin secret instead.
   function_name      = aws_lambda_function.this.function_name
   authorization_type = "NONE" # access is controlled by the origin secret instead
 }
 
 # A function URL without IAM auth needs both of these in the function's resource policy.
 resource "aws_lambda_permission" "function_url" {
+  #checkov:skip=CKV_AWS_301:Public URL permission is required for a function URL without IAM auth; requests still need the origin secret
   statement_id           = "AllowPublicFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.this.function_name
@@ -85,6 +92,7 @@ resource "aws_lambda_permission" "function_url" {
 }
 
 resource "aws_lambda_permission" "invoke_via_url" {
+  #checkov:skip=CKV_AWS_301:Same as the function URL permission above
   statement_id             = "AllowInvokeViaFunctionUrl"
   action                   = "lambda:InvokeFunction"
   function_name            = aws_lambda_function.this.function_name

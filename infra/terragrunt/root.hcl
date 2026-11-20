@@ -42,6 +42,17 @@ provider "aws" {
     tags = merge(${jsonencode(local.common_tags)}, var.extra_default_tags)
   }
 }
+
+# Some global services live in us-east-1 (e.g. WAF for CloudFront). Same tags.
+provider "aws" {
+  alias   = "us_east_1"
+  region  = "us-east-1"
+  profile = "${local.aws_profile}"
+
+  default_tags {
+    tags = merge(${jsonencode(local.common_tags)}, var.extra_default_tags)
+  }
+}
 EOF
 }
 
