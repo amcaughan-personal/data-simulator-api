@@ -8,6 +8,7 @@ Why the API is built the way it is, and what each choice gives up.
 - [Limit responses by cells, not rows](#limit-responses-by-cells-not-rows)
 - [CloudFront in front, not API Gateway (for now)](#cloudfront-in-front-not-api-gateway-for-now)
 - [An origin secret instead of IAM auth on the function URL](#an-origin-secret-instead-of-iam-auth-on-the-function-url)
+- [A circuit breaker that needs a human to reset](#a-circuit-breaker-that-needs-a-human-to-reset)
 - [No API keys](#no-api-keys)
 - [One environment](#one-environment)
 - [Small, reproducible build](#small-reproducible-build)
@@ -64,6 +65,14 @@ Why the API is built the way it is, and what each choice gives up.
 **Why:** CloudFront's built-in protection for Lambda origins (origin access control) requires clients to send a SHA-256 of every POST body, unusable for a public JSON API. The standard workaround computes it in Lambda@Edge, which is billed per request outside the flat-rate plan and would bring back the unbounded cost.
 
 **Trade-off:** someone who learned the (unpublished) function URL could call it directly, skipping WAF. Those calls are rejected in about a millisecond, and the concurrency cap still applies.
+
+## A circuit breaker that needs a human to reset
+
+**Decision:** two CloudWatch alarms watch the function's invocations (more than 1,000 in 5 minutes, or more than 20,000 in a day). Either one triggers a small Lambda that sets the API function's reserved concurrency to 0, and emails. Turning it back on means re-applying the function stack.
+
+**Why:** WAF limits each IP, but many IPs together (or a leaked function URL) could still keep the function busy. The concurrency cap already bounds the rate; the breaker bounds the total. Stopping is automatic because attacks happen at night; restarting is manual because someone should look first. The breaker's role can change concurrency on that one function and nothing else.
+
+**Trade-off:** a genuine traffic spike also takes the API offline until someone resets it. For a demo that's the right way round.
 
 ## No API keys
 
