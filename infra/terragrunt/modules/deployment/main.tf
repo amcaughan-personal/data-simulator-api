@@ -145,10 +145,11 @@ data "aws_iam_policy_document" "deploy" {
   }
   statement {
     # Only for the first deploy, when the alias still points at $LATEST and there is no
-    # version for CodeDeploy to shift from.
+    # version for CodeDeploy to shift from. Lambda authorizes UpdateAlias against the
+    # function's ARN.
     sid       = "PointNewAlias"
     actions   = ["lambda:UpdateAlias"]
-    resources = ["${var.function_arn}:${var.alias_name}"]
+    resources = [var.function_arn]
   }
   statement {
     sid       = "StartAndWatchDeployments"
