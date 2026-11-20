@@ -49,7 +49,7 @@ data "aws_iam_policy_document" "codedeploy_assume" {
 }
 
 data "aws_iam_policy_document" "codedeploy" {
-  #checkov:skip=CKV_AWS_356:DescribeAlarms is read-only; scoped to the alarm's ARN, CodeDeploy was denied (tested), so it needs "*"
+  #checkov:skip=CKV_AWS_356:DescribeAlarms is read-only, and CodeDeploy calls it in a way that only "*" allows
   statement {
     sid       = "MoveTheAlias"
     actions   = ["lambda:GetAlias", "lambda:UpdateAlias", "lambda:GetFunction"]
