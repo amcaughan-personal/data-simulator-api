@@ -1,37 +1,89 @@
 # data-simulator-api
 
-Synthetic event simulation API infrastructure and application code.
+Describe a dataset in a few lines of JSON, get realistic synthetic rows back.
 
-This repository contains:
-- API application code for the simulator
-- Terragrunt/Terraform infrastructure for deploying it
-- local development tooling
-- CI for static analysis and security scanning
+```json
+{
+  "seed": 7,
+  "rows": {"one_per": "institution"},
+  "entities": [{"name": "institution", "count": 25}],
+  "columns": [
+    {"name": "institution_id", "type": "entity", "entity": "institution"},
+    {"name": "type", "type": "categorical", "values": {"bank": 5, "credit_union": 3, "insurer": 2}},
+    {"name": "region", "type": "categorical", "values": ["west", "midwest", "south", "northeast"]},
+    {
+      "name": "employees",
+      "type": "numeric",
+      "base": {"dist": "lognormal", "median": 400, "sigma": 0.9},
+      "effects": [{"field": "type", "op": "multiply", "values": {"bank": 2.5, "credit_union": 0.4}}],
+      "decimals": 0
+    },
+    {"name": "is_public", "type": "flag", "probability": 0.3}
+  ]
+}
+```
 
-`aws_infra` manages the AWS account baseline.
-This repository manages only the simulator application's code and infrastructure.
+```json
+{"institution_id": "institution_0001", "type": "credit_union", "region": "northeast", "employees": 172, "is_public": 0}
+{"institution_id": "institution_0002", "type": "bank", "region": "midwest", "employees": 2320, "is_public": 0}
+{"institution_id": "institution_0003", "type": "credit_union", "region": "midwest", "employees": 173, "is_public": 0}
+```
 
-Repository structure
+## What a spec can describe
 
-- `app/` for application code
-- `infra/terragrunt/modules/` for Terraform modules local to this repo
-- `infra/terragrunt/live/` for deployable stacks
-- `local/` for local development tooling
+**Rows**: what one row is.
 
-Current MVP
+| `rows` | Gives you |
+|---|---|
+| `{"count": 500}` | 500 independent rows |
+| `{"one_per": "user"}` | one row per entity, e.g. a users table |
+| `{"count": 1000, "between": ["2026-01-01", "2026-02-01"]}` | events at random times |
+| `{"every": "1h", "count": 168}` | a regular time series |
+| `{"every": "1h", "count": 168, "one_per": "device"}` | one time series per entity |
 
-- Lambda deployed as a zip package
-- private REST API Gateway enabled for `dev` and scoped to the shared dev VPC from `aws_infra`
-- private API invoke URL published to SSM for easy cross-repo lookup
-- direct dependencies declared in `app/requirements.in`
-- deployable dependency lockfile compiled to `app/requirements.txt`
-- package build performed by Terraform during apply
+**Entities**: pools of things rows refer to (users, cards, devices), each with its own attributes. `"popularity": "skewed"` makes a few of them show up far more often.
 
-Usage
+**Columns**: `numeric`, `categorical`, `flag` (0/1), `entity` (an ID or attribute), `sequence`, `constant`. A numeric value is:
 
-Infrastructure is applied manually via Terragrunt.
-CI should remain limited to static analysis and security scanning unless there is a deliberate reason to automate deploys.
+```
+base (a constant or a distribution)  →  × / + effects from earlier columns  →  + noise  →  clip, round, gaps
+```
 
-License
+The same spec and seed always produce the same data.
+
+## Run it locally
+
+```bash
+uv sync
+uv run uvicorn data_simulator.api.app:app --reload   # http://127.0.0.1:8000/docs
+uv run pytest
+```
+
+Or without the API:
+
+```python
+from data_simulator import DatasetSpec, generate
+
+spec = DatasetSpec.model_validate({"rows": {"count": 3}, "columns": [{"name": "x", "type": "numeric"}]})
+dataset = generate(spec)
+```
+
+## Layout
+
+```
+src/data_simulator/
+  spec.py              the spec: every option, validated (also drives the /docs page)
+  engine/              rows.py → entities.py → columns.py → output.py
+  api/app.py           FastAPI app: GET /health, POST /v1/datasets
+  lambda_handler.py    AWS Lambda entry point
+tests/
+infra/                 Terraform/Terragrunt for AWS (being reworked)
+```
+
+## Status
+
+The app is being rebuilt in small steps. Next: trend and seasonality, anomalies with labels, a preset gallery, then a public deployment with cost controls.
+
+## License
 
 MIT
