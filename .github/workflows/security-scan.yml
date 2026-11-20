@@ -14,94 +14,11 @@ on:
 permissions:
   contents: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
-  checkov:
-    uses: amcaughan-personal/shared_workflows/.github/workflows/scan-checkov.yml@b0424313bd0560290eee28449fd21cd4812838f1
-    with:
-      artifact_name: sarif-checkov
-      sarif_filename: checkov.sarif
-      scan_path: .
-
-  trivy:
-    uses: amcaughan-personal/shared_workflows/.github/workflows/scan-trivy.yml@b0424313bd0560290eee28449fd21cd4812838f1
-    with:
-      artifact_name: sarif-trivy
-      sarif_filename: trivy.sarif
-      scan_path: .
-      scanners: vuln,license
-
-  gitleaks:
-    uses: amcaughan-personal/shared_workflows/.github/workflows/scan-gitleaks.yml@b0424313bd0560290eee28449fd21cd4812838f1
-    with:
-      artifact_name: sarif-gitleaks
-      sarif_filename: gitleaks.sarif
-      redact: true
-      scan_history: ${{ github.event_name == 'pull_request' || inputs.deep_gitleaks }}
-
-  actionlint:
-    uses: amcaughan-personal/shared_workflows/.github/workflows/scan-actionlint.yml@b0424313bd0560290eee28449fd21cd4812838f1
-    with:
-      artifact_name: sarif-actionlint
-      sarif_filename: actionlint.sarif
-
-  report:
-    runs-on: ubuntu-latest
-    if: ${{ always() }}
-    needs: [checkov, trivy, gitleaks, actionlint]
-
+  security:
+    uses: amcaughan-personal/shared_workflows/.github/workflows/security-scan.yml@20ba819e019f64a436091dac143d1dbd0d56715b
     permissions:
       contents: read
       pull-requests: write
-
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: sarif
-
-      - uses: amcaughan-personal/shared_workflows/.github/actions/sarif-report@b0424313bd0560290eee28449fd21cd4812838f1
-        with:
-          title: "Repo security report"
-          sarif_glob: "sarif/**/**/*.sarif"
-          out_html: "out/security-report.html"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: security-report
-          path: out/security-report.html
-          retention-days: 14
-
-      - name: Attach HTML to Step Summary
-        shell: bash
-        run: |
-          {
-            echo "<details open><summary>Security report (HTML)</summary>"
-            cat out/security-report.html
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Build PR comment body
-        if: ${{ github.event_name == 'pull_request' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p out
-          {
-            echo "## Repo security report"
-            echo ""
-            echo "<details open><summary>Report</summary>"
-            echo ""
-            cat out/security-report.html
-            echo ""
-            echo "</details>"
-          } > out/pr-comment.md
-
-      - name: Comment report on PR (upsert)
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: amcaughan-personal/shared_workflows/.github/actions/comment-pr@b0424313bd0560290eee28449fd21cd4812838f1
-        with:
-          comment_name: security-report
-          body_file: out/pr-comment.md
-          token: ${{ secrets.GITHUB_TOKEN }}
+    with:
+      scan_git_history: ${{ github.event_name == 'pull_request' || inputs.deep_gitleaks }}
