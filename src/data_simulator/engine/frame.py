@@ -8,26 +8,27 @@ import numpy as np
 
 
 class GenerationError(ValueError):
-    """A spec that validated but can't be generated, e.g. a lookup effect on a numeric column."""
+    """A spec that validated but can't be generated, e.g. a lookup on a numeric column."""
 
 
 @dataclass
 class Frame:
-    """Columns being built for `n` rows.
+    """Everything known about the `n` rows being built.
 
-    `series` groups rows that belong to one time series (one per entity for per-entity
-    series, a single group otherwise) so noise like random walks accumulates per series.
+    - `profile`: index into the spec's profiles for each row (if there are profiles)
+    - `individual`: index into `ids` for each row (if profiles have a count)
+    - `series`: rows sharing a value form one time series (one per individual, else one)
     """
 
     n: int
     seed: int
+    profile_names: list[str] = field(default_factory=list)
+    profile: np.ndarray | None = None
+    ids: np.ndarray | None = None
+    individual_profile: np.ndarray | None = None
+    individual: np.ndarray | None = None
     timestamps: np.ndarray | None = None
     time_origin: np.datetime64 | None = None
     series: np.ndarray | None = None
-    entity_rows: dict[str, np.ndarray] = field(default_factory=dict)
     columns: dict[str, np.ndarray] = field(default_factory=dict)
     integer_columns: set[str] = field(default_factory=set)
-
-    def __post_init__(self) -> None:
-        if self.series is None:
-            self.series = np.zeros(self.n, dtype=np.int64)

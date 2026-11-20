@@ -6,113 +6,131 @@ from typing import Any
 
 from fastapi.openapi.models import Example
 
-INSTITUTIONS: dict[str, Any] = {
-    "name": "institutions",
-    "description": "One row per institution. Banks tend to be bigger.",
-    "seed": 7,
-    "rows": {"one_per": "institution"},
-    "entities": [{"name": "institution", "count": 25}],
-    "columns": [
-        {"name": "institution_id", "type": "entity", "entity": "institution"},
-        {"name": "type", "type": "categorical", "values": {"bank": 5, "credit_union": 3, "insurer": 2}},
-        {"name": "region", "type": "categorical", "values": ["west", "midwest", "south", "northeast"]},
-        {
-            "name": "employees",
-            "type": "numeric",
-            "base": {"dist": "lognormal", "median": 400, "sigma": 0.9},
-            "effects": [{"field": "type", "op": "multiply", "values": {"bank": 2.5, "credit_union": 0.4}}],
-            "decimals": 0,
-        },
-        {"name": "is_public", "type": "flag", "probability": 0.3},
-    ],
-}
-
 TRANSACTIONS: dict[str, Any] = {
     "name": "transactions",
-    "description": "Card transactions at random times. A few cards are used a lot; premium cards spend more.",
+    "description": "Card transactions at random times from standard and premium cards.",
     "seed": 42,
-    "rows": {"count": 200, "between": ["2026-03-01T00:00:00Z", "2026-03-08T00:00:00Z"]},
-    "entities": [
-        {
-            "name": "card",
-            "count": 40,
+    "profiles": {
+        "standard_card": {
+            "count": 32,
             "popularity": "skewed",
-            "attributes": [{"name": "tier", "type": "categorical", "values": {"standard": 8, "premium": 2}}],
-        }
-    ],
-    "columns": [
-        {"name": "card_id", "type": "entity", "entity": "card"},
-        {"name": "card_tier", "type": "entity", "entity": "card", "attribute": "tier"},
-        {
-            "name": "amount",
-            "type": "numeric",
-            "base": {"dist": "lognormal", "median": 35, "sigma": 0.8},
-            "effects": [{"field": "card_tier", "op": "multiply", "values": {"premium": 1.8}}],
-            "min": 0.5,
-            "decimals": 2,
+            "columns": {
+                "amount": {"lognormal": {"median": 35, "sigma": 0.8}, "round": 2},
+                "items": {"poisson": {"mean": 2}},
+                "declined": {"bernoulli": 0.03},
+            },
         },
-        {"name": "channel", "type": "categorical", "values": {"in_store": 6, "online": 4}},
-    ],
+        "premium_card": {
+            "count": 8,
+            "columns": {
+                "amount": {"lognormal": {"median": 60, "sigma": 0.6}, "round": 2},
+                "items": {"poisson": {"mean": 4}},
+                "declined": {"bernoulli": 0.01},
+            },
+        },
+    },
+    "common_columns": {
+        "channel": {"categorical": {"in_store": 6, "online": 4}},
+    },
+    "rows": {
+        "count": 200,
+        "between": ["2026-03-01T00:00:00Z", "2026-03-08T00:00:00Z"],
+        "from": {"standard_card": 8, "premium_card": 2},
+    },
+    "profile_column": "card_type",
+    "id_column": "card_id",
+}
+
+INSTITUTIONS: dict[str, Any] = {
+    "name": "institutions",
+    "description": "One row per institution.",
+    "seed": 7,
+    "profiles": {
+        "bank": {
+            "count": 12,
+            "columns": {
+                "employees": {"lognormal": {"median": 1000, "sigma": 0.9}, "round": 0},
+                "is_public": {"bernoulli": 0.5},
+            },
+        },
+        "credit_union": {
+            "count": 8,
+            "columns": {
+                "employees": {"lognormal": {"median": 160, "sigma": 0.7}, "round": 0},
+                "is_public": {"constant": 0},
+            },
+        },
+        "insurer": {
+            "count": 5,
+            "columns": {
+                "employees": {"lognormal": {"median": 400, "sigma": 0.9}, "round": 0},
+                "is_public": {"bernoulli": 0.4},
+            },
+        },
+    },
+    "common_columns": {
+        "region": {"categorical": ["west", "midwest", "south", "northeast"]},
+    },
+    "rows": {"one_each": True},
 }
 
 SENSOR_FLEET: dict[str, Any] = {
     "name": "sensor_fleet",
-    "description": "Hourly readings per device. Each device reads a bit high or low, and drifts.",
+    "description": "Hourly readings from indoor and outdoor sensors. Each sensor reads a bit high or low.",
     "seed": 3,
-    "rows": {"every": "1h", "count": 24, "one_per": "device"},
-    "entities": [
-        {
-            "name": "device",
-            "count": 5,
-            "attributes": [
-                {
-                    "name": "offset",
-                    "type": "numeric",
-                    "base": {"dist": "normal", "stddev": 1.5},
-                    "decimals": 2,
+    "profiles": {
+        "indoor": {
+            "count": 3,
+            "columns": {
+                "temperature_c": {
+                    "constant": 21,
+                    "add": "calibration_offset",
+                    "noise": {"random_walk": {"step": 0.1}},
+                    "round": 2,
                 }
-            ],
-        }
-    ],
-    "columns": [
-        {"name": "device_id", "type": "entity", "entity": "device"},
-        {"name": "device_offset", "type": "entity", "entity": "device", "attribute": "offset"},
-        {
-            "name": "temperature_c",
-            "type": "numeric",
-            "base": 21.0,
-            "effects": [{"field": "device_offset", "op": "add"}],
-            "noise": {"kind": "random_walk", "step": 0.2},
-            "decimals": 2,
-            "missing_rate": 0.02,
+            },
         },
-    ],
+        "outdoor": {
+            "count": 2,
+            "columns": {
+                "temperature_c": {
+                    "constant": 12,
+                    "add": "calibration_offset",
+                    "seasonality": [{"period": "1d", "amplitude": 5, "peak": "15h"}],
+                    "noise": {"normal": {"stddev": 0.5}},
+                    "round": 2,
+                    "missing": 0.05,
+                }
+            },
+        },
+    },
+    "common_columns": {
+        "calibration_offset": {"normal": {"mean": 0, "stddev": 0.8}, "per": "id", "round": 2},
+    },
+    "rows": {"every": "1h", "count": 24, "one_each": True},
 }
 
 WEB_TRAFFIC: dict[str, Any] = {
     "name": "web_traffic",
-    "description": "Hourly page views for two weeks: growing 1% a day, busiest at 2pm and on weekdays.",
+    "description": "Hourly page views for two weeks: growing 1% a day, busiest at 2pm and midweek.",
     "seed": 11,
-    "rows": {"every": "1h", "count": 336, "start": "2026-03-02T00:00:00Z"},
-    "columns": [
-        {
-            "name": "page_views",
-            "type": "numeric",
-            "base": 1000,
-            "trend": {"kind": "growth", "rate": 0.01, "per": "1d"},
+    "common_columns": {
+        "page_views": {
+            "constant": 1000,
+            "trend": {"growth": 0.01, "per": "1d"},
             "seasonality": [
                 {"period": "1d", "amplitude": 400, "peak": "14h"},
                 {"period": "7d", "amplitude": 150, "peak": "2d"},
             ],
-            "noise": {"kind": "poisson"},
-            "min": 0,
+            "noise": {"poisson": True},
         }
-    ],
+    },
+    "rows": {"every": "1h", "count": 336, "start": "2026-03-02T00:00:00Z"},
 }
 
 DATASET_EXAMPLES: dict[str, Example] = {
-    "web_traffic": Example(summary="Time series with trend and daily/weekly cycles", value=WEB_TRAFFIC),
-    "institutions": Example(summary="One row per institution", value=INSTITUTIONS),
-    "transactions": Example(summary="Events at random times", value=TRANSACTIONS),
-    "sensor_fleet": Example(summary="Hourly time series per device", value=SENSOR_FLEET),
+    "transactions": Example(summary="Two profiles, rows drawn 80/20 at random times", value=TRANSACTIONS),
+    "institutions": Example(summary="One row per institution, three profiles", value=INSTITUTIONS),
+    "sensor_fleet": Example(summary="Hourly time series per sensor", value=SENSOR_FLEET),
+    "web_traffic": Example(summary="One time series with trend and cycles", value=WEB_TRAFFIC),
 }

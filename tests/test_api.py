@@ -19,11 +19,11 @@ def test_docs_examples_work(client, name):
 
 
 def test_bad_requests_return_422_with_a_reason(client):
-    columns = [{"name": "x", "type": "numeric"}]
-    unknown_entity = client.post("/v1/datasets", json={"rows": {"one_per": "bank"}, "columns": columns})
-    assert unknown_entity.status_code == 422 and "unknown entity 'bank'" in unknown_entity.text
+    columns = {"x": {"normal": {}}}
+    invalid = client.post("/v1/datasets", json={"rows": {"one_each": True}, "common_columns": columns})
+    assert invalid.status_code == 422 and "needs every profile to have a count" in invalid.text
 
-    too_big = client.post("/v1/datasets", json={"rows": {"count": 501}, "columns": columns})
+    too_big = client.post("/v1/datasets", json={"rows": {"count": 501}, "common_columns": columns})
     assert too_big.status_code == 422 and "limit is 500" in too_big.text
 
 
