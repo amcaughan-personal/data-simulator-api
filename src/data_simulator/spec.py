@@ -15,7 +15,7 @@ DEFAULT_START = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", validate_default=True)
 
 
 # --------------------------------------------------------------------------------------
@@ -142,6 +142,37 @@ class Effect(_Model):
     values: dict[str, float] | None = None
 
 
+class LinearTrend(_Model):
+    """Add `change` every `per`: `{"kind": "linear", "change": 5, "per": "1d"}`."""
+
+    kind: Literal["linear"]
+    change: float
+    per: Duration = "1d"
+
+
+class GrowthTrend(_Model):
+    """Grow the base by `rate` every `per`, compounding: 0.02 = 2% per period."""
+
+    kind: Literal["growth"]
+    rate: float = Field(..., gt=-1)
+    per: Duration = "1d"
+
+
+Trend = Annotated[LinearTrend | GrowthTrend, Field(discriminator="kind")]
+
+
+class Cycle(_Model):
+    """A repeating up-and-down pattern, e.g. daily traffic peaking at 2pm.
+
+    Cycles line up with Monday 00:00 UTC, so a daily `peak` of '14h' is 2pm and a weekly
+    `peak` of '5d' is Saturday.
+    """
+
+    period: Duration
+    amplitude: float = Field(..., description="How far above (and below) the base the cycle swings.")
+    peak: Duration = Field("0s", description="Time into the cycle where it is highest.")
+
+
 class NormalNoise(_Model):
     kind: Literal["normal"]
     stddev: float = Field(..., gt=0)
@@ -180,10 +211,12 @@ class _Column(_Model):
 
 
 class NumericColumn(_Column):
-    """`value = base × effects + noise`, then clipped and rounded."""
+    """`value = base + trend + seasonality`, then effects, then noise; clipped and rounded."""
 
     type: Literal["numeric"]
     base: float | Distribution = Field(0.0, description="A constant or a distribution to draw from.")
+    trend: Trend | None = Field(None, description="Needs rows with timestamps.")
+    seasonality: list[Cycle] = Field(default_factory=list, description="Needs rows with timestamps.")
     effects: list[Effect] = Field(default_factory=list)
     noise: Noise | None = None
     min: float | None = None
@@ -265,6 +298,10 @@ class EntitySpec(_Model):
         for attribute in self.attributes:
             if isinstance(attribute, EntityColumn):
                 raise ValueError(f"entity {self.name}: attributes can't be entity references")
+            if _uses_time(attribute):
+                raise ValueError(
+                    f"entity {self.name}: attribute {attribute.name} can't use trend or seasonality"
+                )
             _check_effect_sources(attribute, names, f"entity {self.name}")
             names.append(attribute.name)
         _check_unique(names, f"entity {self.name} attribute")
@@ -296,6 +333,10 @@ class DatasetSpec(_Model):
                 attributes = {attribute.name for attribute in entity.attributes}
                 if column.attribute is not None and column.attribute not in attributes:
                     raise ValueError(f"{column.name}: entity {column.entity!r} has no {column.attribute!r}")
+            if _uses_time(column) and not self.rows.has_timestamps:
+                raise ValueError(
+                    f"{column.name}: trend and seasonality need timestamps; set rows.every or rows.between"
+                )
             _check_effect_sources(column, names, "columns")
             names.append(column.name)
         _check_unique(names, "column")
@@ -307,6 +348,10 @@ class DatasetSpec(_Model):
         per_entity = entity_counts[self.rows.one_per] if self.rows.one_per else 1
         steps = self.rows.count if self.rows.count is not None else 1
         return steps * per_entity
+
+
+def _uses_time(column: Any) -> bool:
+    return isinstance(column, NumericColumn) and (column.trend is not None or bool(column.seasonality))
 
 
 def _check_effect_sources(column: Any, earlier: list[str], where: str) -> None:

@@ -33,6 +33,10 @@ def test_row_shapes(rows, expected):
         ({"rows": {"every": "1h"}}, "needs 'count'"),
         ({"rows": {"one_per": "bank"}}, "unknown entity 'bank'"),
         (
+            {"columns": [{"name": "y", "type": "numeric", "trend": {"kind": "linear", "change": 1}}]},
+            "need timestamps",
+        ),
+        (
             {
                 "columns": [
                     {"name": "y", "type": "numeric", "effects": [{"field": "z", "values": {"a": 2}}]},

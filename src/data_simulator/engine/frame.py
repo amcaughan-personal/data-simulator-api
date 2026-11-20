@@ -22,6 +22,7 @@ class Frame:
     n: int
     seed: int
     timestamps: np.ndarray | None = None
+    time_origin: np.datetime64 | None = None
     series: np.ndarray | None = None
     entity_rows: dict[str, np.ndarray] = field(default_factory=dict)
     columns: dict[str, np.ndarray] = field(default_factory=dict)

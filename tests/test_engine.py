@@ -73,6 +73,29 @@ def test_effects():
     assert column(dataset, "plus_x")[:3] == [11, 12, 13]
 
 
+def test_trend_and_seasonality():
+    raw = {
+        "rows": {"every": "1h", "count": 24 * 14},
+        "columns": [
+            {"name": "linear", "type": "numeric", "base": 100, "trend": {"kind": "linear", "change": 10}},
+            {"name": "growth", "type": "numeric", "base": 100, "trend": {"kind": "growth", "rate": 0.1}},
+            {
+                "name": "daily",
+                "type": "numeric",
+                "base": 100,
+                "seasonality": [{"period": "1d", "amplitude": 20, "peak": "14h"}],
+            },
+        ],
+    }
+    rows = run(raw)["rows"]
+    day_two = rows[24]  # 2026-01-02T00:00, one day in
+    assert day_two["linear"] == pytest.approx(110)
+    assert day_two["growth"] == pytest.approx(110)
+
+    peak = max(rows[:24], key=lambda r: r["daily"])
+    assert peak["timestamp"] == "2026-01-01T14:00:00Z" and peak["daily"] == pytest.approx(120)
+
+
 @pytest.mark.parametrize(
     ("noise", "check"),
     [

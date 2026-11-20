@@ -13,6 +13,8 @@ from data_simulator.spec import (
     Effect,
     Exponential,
     FlagColumn,
+    GrowthTrend,
+    LinearTrend,
     LogNormal,
     Noise,
     Normal,
@@ -25,6 +27,9 @@ from data_simulator.spec import (
     Uniform,
     UniformNoise,
 )
+
+# Seasonal cycles line up with this Monday at 00:00 UTC.
+CYCLE_ANCHOR = np.datetime64("2024-01-01T00:00:00", "ms")
 
 
 def generate_column(column: Column, frame: Frame, rng: np.random.Generator) -> np.ndarray:
@@ -55,6 +60,9 @@ def _numeric(column: NumericColumn, frame: Frame, rng: np.random.Generator) -> n
     else:
         values = draw(column.base, frame.n, rng)
 
+    if column.trend is not None or column.seasonality:
+        values = _add_time_patterns(values, column, frame)
+
     for effect in column.effects:
         values = apply_effect(values, effect, frame, column.name)
 
@@ -65,6 +73,23 @@ def _numeric(column: NumericColumn, frame: Frame, rng: np.random.Generator) -> n
         values = np.clip(values, column.min, column.max)
     if column.decimals is not None:
         values = np.round(values, column.decimals)
+    return values
+
+
+def _add_time_patterns(values: np.ndarray, column: NumericColumn, frame: Frame) -> np.ndarray:
+    one_second = np.timedelta64(1, "s")
+    trend = column.trend
+    if trend is not None:
+        periods = (frame.timestamps - frame.time_origin) / one_second / trend.per.total_seconds()
+        if isinstance(trend, LinearTrend):
+            values = values + trend.change * periods
+        elif isinstance(trend, GrowthTrend):
+            values = values * (1 + trend.rate) ** periods
+
+    seconds = (frame.timestamps - CYCLE_ANCHOR) / one_second
+    for cycle in column.seasonality:
+        phase = (seconds - cycle.peak.total_seconds()) / cycle.period.total_seconds()
+        values = values + cycle.amplitude * np.cos(2 * np.pi * phase)
     return values
 
 
