@@ -13,6 +13,7 @@ curl -X POST https://d1dfbd1pkurhz5.cloudfront.net/v1/datasets \
 
 ```json
 {"name": "dataset", "seed": 1, "row_count": 3, "columns": ["region", "orders"],
+ "types": {"region": "string", "orders": "integer"},
  "rows": [{"region": "south", "orders": 5}, {"region": "north", "orders": 4}, {"region": "north", "orders": 3}]}
 ```
 

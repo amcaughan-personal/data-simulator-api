@@ -255,9 +255,10 @@ class ColumnSpec(_Model):
         for anomaly in self.anomalies:
             if not self.is_numeric and (anomaly.multiply is not None or anomaly.add is not None):
                 raise ValueError(f"anomaly {anomaly.name}: multiply and add only apply to numeric columns")
-            if self.is_numeric and anomaly.set is not None and not _is_number(anomaly.set):
+            if anomaly.set is not None and _value_type(anomaly.set) != self.value_type:
                 raise ValueError(
-                    f"anomaly {anomaly.name}: a numeric column can only be set to a number or null"
+                    f"anomaly {anomaly.name}: this column holds {self.value_type} values, "
+                    f"so it can only be set to a {self.value_type} or null"
                 )
         return self
 
@@ -271,6 +272,15 @@ class ColumnSpec(_Model):
         if self.kind == "constant":
             return _is_number(self.constant)
         return self.kind != "categorical"
+
+    @property
+    def value_type(self) -> str | None:
+        """'number', 'string' or 'boolean'; None for a column that is always empty."""
+        if self.is_numeric:
+            return "number"
+        if self.kind == "constant":
+            return _value_type(self.constant)
+        return "string"
 
     @property
     def uses_time(self) -> bool:
@@ -289,6 +299,14 @@ class ColumnSpec(_Model):
 
 def _is_number(value: object) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _value_type(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "boolean"
+    return "number" if _is_number(value) else "string"
 
 
 # --------------------------------------------------------------------------------------
@@ -449,6 +467,11 @@ class _TableSpec(_Model):
                 raise ValueError(f"column name {name!r} is used twice")
             for spec in self.specs_for(name):
                 self._check_column(name, spec, earlier)
+            types = {spec.value_type for spec in self.specs_for(name) if spec is not None} - {None}
+            if len(types) > 1:
+                raise ValueError(
+                    f"{name}: profiles must give a column one type, but it's {' and '.join(sorted(types))}"
+                )
             earlier.append(name)
         if self.has_anomalies and self.anomaly_column in earlier:
             raise ValueError(f"column name {self.anomaly_column!r} is used twice")

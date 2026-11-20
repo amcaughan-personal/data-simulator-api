@@ -25,6 +25,7 @@ def test_csv_on_request(client):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
     assert response.headers["x-seed"] == str(spec["seed"])
+    assert response.headers["x-column-types"].startswith("timestamp:timestamp,id:string,")
 
     lines = response.text.splitlines()
     assert lines[0] == "timestamp,id,profile,calibration_offset,temperature_c,anomaly"

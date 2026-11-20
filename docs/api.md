@@ -137,12 +137,17 @@ id,number_1,count_1,category_1
 JSON responses carry the data plus what's needed to reproduce it:
 
 ```json
-{"name": "...", "description": "...", "seed": 42, "row_count": 200, "columns": ["..."], "rows": [{"...": "..."}]}
+{"name": "...", "description": "...", "seed": 42, "row_count": 200,
+ "columns": ["timestamp", "id", "amount"],
+ "types": {"timestamp": "timestamp", "id": "string", "amount": "number"},
+ "rows": [{"...": "..."}]}
 ```
+
+`types` gives each column's type, so a pipeline can create its table without guessing: `integer`, `number`, `string`, `boolean` or `timestamp` (ISO 8601, UTC). Any value can also be `null`. Types come from the spec, so every response and stream window for a spec has the same ones. That's also why profiles must give a column one type, and an anomaly's `set` value must match it.
 
 Omit `seed` to get a random one; it comes back in the response, so any result can be regenerated.
 
-Send `Accept: text/csv` to get CSV instead. The seed and row count come back as `X-Seed` and `X-Row-Count` headers.
+Send `Accept: text/csv` to get CSV instead. The seed, row count and types come back as headers: `X-Seed`, `X-Row-Count` and `X-Column-Types` (`timestamp:timestamp,id:string,amount:number`).
 
 ```bash
 curl -X POST https://d1dfbd1pkurhz5.cloudfront.net/v1/datasets \
