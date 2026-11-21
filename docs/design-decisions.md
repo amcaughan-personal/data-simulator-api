@@ -81,7 +81,7 @@ The exception is `GET /v1/datasets/simple`, whose input is just a few numbers.
 
 **Why:** the requirement is that a flood of traffic can't run up a bill. API Gateway bills per request, and AWS's documentation doesn't say whether rejected requests (`403`, or `429` for throttling or quotas) are billed, so a worst-case estimate has to assume they are. CloudFront's flat-rate plan has no overage charges, includes WAF, and doesn't count requests WAF blocks against its allowance.
 
-**Open question:** an experiment (4,706 requests to a throwaway API Gateway API, in batches sized so the bill reveals which kinds are billed) is waiting on Cost Explorer. If rejected requests turn out to be free, API Gateway with throttling becomes the preferred front door. The front door is a separate stack for exactly that reason.
+**What testing showed:** API Gateway doesn't bill rejected requests. A throwaway REST API received 4,706 requests in batches sized so the bill would show which kinds count: only the 194 successful ones were billed, and the 403s (missing or invalid API key) and 429s (throttling and usage-plan quotas) were free. So API Gateway with throttling and quotas would also give a bounded cost, and it's a candidate front door. Switching would be a change to the front-door stack alone, which is kept separate for that reason.
 
 **Trade-offs found by testing the Free plan:** it allows up to 5 WAF rules, but rejects custom block responses, body-size rules and method matching. So rate-limited clients get WAF's default `403` rather than a `429`, and the app enforces the body limit (`413`) and methods (`405`) itself.
 
