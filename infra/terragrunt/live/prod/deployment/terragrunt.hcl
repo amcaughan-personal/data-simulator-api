@@ -28,4 +28,5 @@ inputs = {
   deployment_config  = local.env.deployment_config
   github_repository  = "amcaughan-personal/data-simulator-api"
   github_environment = local.env.github_environment
+  alert_topic_name   = local.env.alert_topic_name
 }

@@ -27,6 +27,7 @@ Datasets can mix several kinds of things (standard and premium cards, indoor and
 |---|---|
 | [Using the API](docs/api.md) | The spec and every option, streams, CSV, limits and errors |
 | [Examples](docs/examples.md) | Complete specs and the data they produce |
+| [How it's built](docs/engineering.md) | A tour of the engineering: checks, staging and canary deploys, cost ceiling, security, monitoring |
 | [AWS architecture](docs/aws.md) | How it runs: CloudFront, WAF, Lambda, Terraform layout, cost controls, deploying |
 | [Design decisions](docs/design-decisions.md) | Why it's built this way, and what was traded off |
 

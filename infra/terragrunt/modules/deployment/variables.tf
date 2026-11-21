@@ -21,6 +21,12 @@ variable "github_repository" {
   type        = string
 }
 
+variable "alert_topic_name" {
+  description = "Existing SNS topic (from personal-infra) to email when the error alarm fires; null for no email."
+  type        = string
+  default     = null
+}
+
 variable "github_environment" {
   description = "Only workflow jobs in this GitHub environment can deploy (see personal-infra)."
   type        = string

@@ -12,6 +12,7 @@ terragrunt/
     circuit-breaker/            alarms + a Lambda that stops the function if it's overused
     deployment/                 CodeDeploy (canary + rollback) and the role CI deploys as
     github-variables/           publishes the deploy workflow's settings for GitHub (via SSM)
+    smoke-test/                 a daily Synthetics canary running the smoke tests (production only)
   live/
     prod/                       production; env.hcl holds its names and limits
       api-function/             the function and its live alias
