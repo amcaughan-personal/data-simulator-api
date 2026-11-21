@@ -135,7 +135,7 @@ flowchart LR
 | What | How | Cost |
 |---|---|---|
 | Error alarm (per environment) | Failed invocations plus 5xx responses from the `live` alias (a 500 from the app doesn't fail the invocation, so both count). Triggers the canary rollback during deploys; in production it also emails via the `security-alerts` topic. | about $0.10 a month |
-| Scheduled smoke test | [`smoke-test.yml`](../.github/workflows/smoke-test.yml) runs the smoke tests against production every 6 hours; GitHub emails on failure | free |
+| Scheduled smoke test | A CloudWatch Synthetics canary (`smoke-test` stack, production only) sends the smoke-test requests every day at 09:00 UTC; an alarm emails if a run fails. Run artifacts expire after two weeks. | about $0.10 a month (the alarm; 30 runs a month are within the free 100) |
 | Circuit-breaker alarms | email when the breaker trips (see above) | included above |
 
 ## Infrastructure as code
@@ -148,6 +148,7 @@ infra/terragrunt/
     front-door/cloudfront/      CloudFront + WAF + Free plan subscription
     circuit-breaker/            alarms + a Lambda that stops the function when they fire
     deployment/                 CodeDeploy + rollback alarm + the role CI deploys as
+    smoke-test/                 a daily Synthetics canary running the smoke tests, and its alarm
     github-variables/           publishes values the deploy workflow needs (see below)
   live/
     prod/
@@ -157,6 +158,7 @@ infra/terragrunt/
       circuit-breaker/          watches api-function
       deployment/               how code reaches the live alias
       github-variables/         API_URL, DEPLOY_ROLE_ARN, FUNCTION_NAME for GitHub
+      smoke-test/               production only
     staging/                    the same stacks, with staging's env.hcl
 ```
 

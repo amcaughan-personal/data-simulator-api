@@ -69,8 +69,9 @@ Details: [AWS architecture: cost bounds](aws.md#cost-bounds).
 
 - **Error alarm** on the `live` alias: failed invocations plus 5xx responses. It triggers the
   canary rollback during deploys, and emails in production.
-- **Scheduled smoke test:** every 6 hours, the [smoke tests](../scripts/smoke-test.sh) run
-  against production from GitHub Actions.
+- **Scheduled smoke test:** every day, a CloudWatch Synthetics canary sends the same
+  requests as the [smoke tests](../scripts/smoke-test.sh) to production, and emails if one
+  fails.
 - **Circuit-breaker alarms** email when they trip.
 
 ## Infrastructure as code
