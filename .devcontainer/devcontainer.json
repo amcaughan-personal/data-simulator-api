@@ -1,0 +1,22 @@
+{
+  "name": "data-simulator-api",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "dev",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "mounts": [
+    "source=${localEnv:HOME}/.aws,target=/home/dev/.aws,type=bind"
+  ],
+  "remoteEnv": {
+    "AWS_PROFILE": "default"
+  },
+  "postCreateCommand": "uv sync",
+  "customizations": {
+    "vscode": {
+      "extensions": ["hashicorp.terraform", "ms-python.python", "charliermarsh.ruff"]
+    }
+  }
+}

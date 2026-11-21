@@ -25,8 +25,16 @@ updates:
         patterns: ["*"]
   - package-ecosystem: docker
     directories:
-      - /local-dev/docker
+      - /.devcontainer
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      # Only refresh each image's digest (patches for the same version). Moving to a new
+      # OS or language version is a deliberate change, not an automatic one.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

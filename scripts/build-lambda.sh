@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build dist/lambda.zip: the app plus its runtime dependencies (no dev tools), as Linux
-# arm64 wheels for the Lambda Python 3.12 runtime.
+# arm64 wheels for the Lambda Python runtime in .python-version.
 #
 # Files are added in sorted order with a fixed timestamp, so unchanged code produces a
 # byte-identical zip and Terraform only redeploys when something actually changed.
@@ -17,7 +17,7 @@ uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements.
   > build/requirements.txt
 uv pip install --quiet \
   --target "$build_dir" \
-  --python-version 3.12 \
+  --python-version "$(cat .python-version)" \
   --python-platform aarch64-manylinux_2_28 \
   --only-binary :all: \
   -r build/requirements.txt

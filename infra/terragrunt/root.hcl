@@ -1,4 +1,15 @@
+# Tool versions are set once, in the repo's .tool-versions (also read by the dev container and
+# CI). Running with any other version stops here instead of drifting.
+terraform_version_constraint  = "= ${local.tool_versions.terraform}"
+terragrunt_version_constraint = "= ${local.tool_versions.terragrunt}"
+
 locals {
+  tool_versions = {
+    for line in split("\n", file("${get_repo_root()}/.tool-versions")) :
+    split(" ", trimspace(line))[0] => split(" ", trimspace(line))[1]
+    if length(regexall("^[a-z]", trimspace(line))) > 0
+  }
+
   aws_region  = "us-east-2"
   aws_profile = "default"
 

@@ -62,7 +62,7 @@ resource "aws_lambda_function" "breaker" {
   #checkov:skip=CKV_AWS_173:The only env var is the target function's name, not a secret
   function_name = var.name
   role          = aws_iam_role.breaker.arn
-  runtime       = "python3.12"
+  runtime       = "python3.14"
   architectures = ["arm64"]
   handler       = "breaker.handler"
 

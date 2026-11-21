@@ -1,0 +1,5 @@
+# The one place tool versions are set. The dev container (via mise), CI and root.hcl's
+# version constraints read this file. Python's version is in .python-version.
+terraform 1.17.2
+terragrunt 1.2.2
+uv 0.13.8

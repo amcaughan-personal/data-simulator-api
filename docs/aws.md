@@ -32,7 +32,7 @@ flowchart LR
 
     subgraph region["us-east-2"]
         url[Function URL on the live alias]
-        fn[Lambda function<br/>Python 3.12 · arm64 · 512 MB<br/>reserved concurrency 2]
+        fn[Lambda function<br/>Python 3.14 · arm64 · 512 MB<br/>reserved concurrency 2]
         logs[(CloudWatch Logs<br/>14 days)]
         url --> fn --> logs
         alarms{{CloudWatch alarms<br/>>1,000 invocations / 5 min<br/>>20,000 / day}}
@@ -162,7 +162,7 @@ stack wouldn't change.
 Infrastructure is applied by hand, plan first, staging before production:
 
 ```bash
-local-dev/dev-shell.sh                            # shell with pinned Terraform and Terragrunt
+# in the dev container (VS Code: Reopen in Container, or see the README)
 cd infra/terragrunt/live/staging/api-function && terragrunt plan -out=plan && terragrunt apply plan
 cd ../../prod/api-function && terragrunt plan -out=plan && terragrunt apply plan
 ```
