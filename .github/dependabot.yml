@@ -5,15 +5,17 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     cooldown:
       default-days: 7
+      # Our own shared workflows are already reviewed; take new versions right away.
+      exclude: ["amcaughan-personal/*"]
     groups:
+      shared-workflows:
+        patterns: ["amcaughan-personal/*"]
       actions:
         patterns: ["*"]
-    ignore:
-      # Shared workflows are pinned to a main commit and bumped on purpose.
-      - dependency-name: "amcaughan-personal/*"
+        exclude-patterns: ["amcaughan-personal/*"]
   - package-ecosystem: uv
     directory: /
     schedule:
