@@ -125,6 +125,14 @@ flowchart LR
   publish and deploy that one function, and nothing else.
 - **Rolling back:** re-run an earlier run of the workflow (or let the alarm do it during
   a canary). Versions are immutable, so the old code is still there.
+- **Checking the automatic rollback:** start a CodeDeploy deployment between two existing
+  versions, then force the error alarm while the canary is running. CodeDeploy stops the
+  deployment and moves all traffic back within seconds:
+
+  ```bash
+  aws cloudwatch set-alarm-state --alarm-name data-simulator-api-live-errors \
+    --state-value ALARM --state-reason "Checking the canary rollback"
+  ```
 - **Who owns what:** Terraform owns the function's configuration and creates the alias;
   CI owns the code and which version the alias points to (Terraform ignores both).
   Configuration changes reach traffic with the next deploy, because each published
