@@ -39,7 +39,8 @@ uv run pytest
 ```
 
 uv uses the Python version in `.python-version`. For infrastructure work, open the repo in
-the dev container (VS Code: *Reopen in Container*): it has the AWS CLI and the Terraform,
+the dev container (VS Code: *Reopen in Container*): the org's base image (from
+[dev-environment](https://github.com/amcaughan-personal/dev-environment)) plus the Terraform,
 Terragrunt and uv versions from `.tool-versions`. Without VS Code:
 
 ```bash
