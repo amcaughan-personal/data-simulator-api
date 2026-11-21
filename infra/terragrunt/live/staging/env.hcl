@@ -6,6 +6,9 @@ locals {
   deployment_config = "CodeDeployDefault.LambdaAllAtOnce"
 
   # Staging only sees deploys and smoke tests, so it gets much lower limits.
+  # Staging only sees deploys and smoke tests; its errors don't email.
+  alert_topic_name = null
+
   reserved_concurrency          = 1
   requests_per_5_minutes_per_ip = 100
   max_invocations_per_5_minutes = 200

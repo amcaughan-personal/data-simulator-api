@@ -7,6 +7,9 @@ locals {
   # the error alarm fires.
   deployment_config = "CodeDeployDefault.LambdaCanary10Percent5Minutes"
 
+  # Email when the live alias returns errors (the topic is from personal-infra).
+  alert_topic_name = "security-alerts"
+
   reserved_concurrency          = 2
   requests_per_5_minutes_per_ip = 100
   max_invocations_per_5_minutes = 1000

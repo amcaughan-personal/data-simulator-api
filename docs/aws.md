@@ -130,6 +130,14 @@ flowchart LR
   Configuration changes reach traffic with the next deploy, because each published
   version keeps the configuration it was published with.
 
+## Monitoring
+
+| What | How | Cost |
+|---|---|---|
+| Error alarm (per environment) | Failed invocations plus 5xx responses from the `live` alias (a 500 from the app doesn't fail the invocation, so both count). Triggers the canary rollback during deploys; in production it also emails via the `security-alerts` topic. | about $0.10 a month |
+| Scheduled smoke test | [`smoke-test.yml`](../.github/workflows/smoke-test.yml) runs the smoke tests against production every 6 hours; GitHub emails on failure | free |
+| Circuit-breaker alarms | email when the breaker trips (see above) | included above |
+
 ## Infrastructure as code
 
 ```

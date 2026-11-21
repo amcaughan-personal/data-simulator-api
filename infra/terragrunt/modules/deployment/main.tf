@@ -17,21 +17,53 @@ locals {
 }
 
 # --------------------------------------------------------------------------------------
-# Rollback trigger: any error from the live alias during a deployment
+# Errors from the live alias: failed invocations, plus requests answered with a 5xx (an
+# unhandled exception in the app returns a 500 without failing the invocation). During a
+# deployment, CodeDeploy rolls back when this fires; with alert_topic_name set, it also emails.
 # --------------------------------------------------------------------------------------
+
+data "aws_sns_topic" "alerts" {
+  count = var.alert_topic_name == null ? 0 : 1
+  name  = var.alert_topic_name
+}
 
 resource "aws_cloudwatch_metric_alarm" "errors" {
   alarm_name          = "${var.function_name}-live-errors"
-  alarm_description   = "Errors from ${var.function_name}:${var.alias_name}. During a deployment, CodeDeploy rolls back when this fires."
-  namespace           = "AWS/Lambda"
-  metric_name         = "Errors"
-  dimensions          = { FunctionName = var.function_name, Resource = "${var.function_name}:${var.alias_name}" }
-  statistic           = "Sum"
-  period              = 60
+  alarm_description   = "Failed invocations or 5xx responses from ${var.function_name}:${var.alias_name}. During a deployment, CodeDeploy rolls back when this fires."
   evaluation_periods  = 1
   threshold           = 0
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
+  alarm_actions       = data.aws_sns_topic.alerts[*].arn
+
+  metric_query {
+    id          = "errors"
+    expression  = "FILL(failed, 0) + FILL(server_errors, 0)"
+    label       = "Failed invocations + 5xx responses"
+    return_data = true
+  }
+
+  metric_query {
+    id = "failed"
+    metric {
+      namespace   = "AWS/Lambda"
+      metric_name = "Errors"
+      dimensions  = { FunctionName = var.function_name, Resource = "${var.function_name}:${var.alias_name}" }
+      stat        = "Sum"
+      period      = 60
+    }
+  }
+
+  metric_query {
+    id = "server_errors"
+    metric {
+      namespace   = "AWS/Lambda"
+      metric_name = "Url5xxCount"
+      dimensions  = { FunctionName = var.function_name, Resource = "${var.function_name}:${var.alias_name}" }
+      stat        = "Sum"
+      period      = 60
+    }
+  }
 }
 
 # --------------------------------------------------------------------------------------
