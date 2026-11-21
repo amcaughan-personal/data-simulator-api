@@ -1,10 +1,10 @@
 {
-  "name": "data-simulator-api",
+  "name": "${localWorkspaceFolderBasename}",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "runArgs": ["--hostname", "data-simulator-api"],
+  "runArgs": ["--hostname", "${localWorkspaceFolderBasename}"],
   "remoteUser": "dev",
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",

@@ -32,6 +32,8 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+      # The org's own base image is already reviewed; take new digests right away.
+      exclude: ["ghcr.io/amcaughan-personal/*"]
     groups:
       base-images:
         patterns: ["*"]
