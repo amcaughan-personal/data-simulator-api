@@ -42,7 +42,7 @@ flowchart LR
         breaker -->|concurrency → 0| fn
     end
 
-    alarms -->|email| sns([security-alerts topic<br/>personal_infra])
+    alarms -->|email| sns([security-alerts topic<br/>personal-infra])
     other([Anyone calling the<br/>function URL directly]) -.->|no secret → 403| url
 ```
 
@@ -69,7 +69,7 @@ flowchart LR
 Every resource is tagged with `Repo = amcaughan-personal/data-simulator-api` and its
 `Stack` (e.g. `live/prod/front-door`), so anything in the console points back to this code.
 The account baseline (CloudTrail, GuardDuty, budgets, the state bucket) lives in
-[personal_infra](https://github.com/amcaughan-personal/personal_infra).
+[personal-infra](https://github.com/amcaughan-personal/personal-infra).
 
 ## Cost bounds
 
@@ -79,7 +79,7 @@ The account baseline (CloudTrail, GuardDuty, budgets, the state bucket) lives in
 | Lambda | Reserved concurrency of 2: at most two requests run at once, and requests beyond that are throttled (Lambda doesn't bill throttled requests). Each request is bounded by the 100,000-cell response limit and a 10 s timeout. |
 | Direct calls to the function URL | Rejected by the app in about a millisecond, and subject to the same concurrency cap. |
 | Sustained heavy use | The circuit breaker stops the function after 1,000 invocations in 5 minutes or 20,000 in a day. At the daily limit, Lambda costs about $0.05 a day. |
-| Everything else | The account's monthly budget and cost anomaly alerts (personal_infra). |
+| Everything else | The account's monthly budget and cost anomaly alerts (personal-infra). |
 
 In practice, a burst from one IP starts getting `429` from the concurrency cap
 straight away, and `403` from WAF within about half a minute. When the circuit breaker
@@ -117,7 +117,7 @@ flowchart LR
   minutes, then all of them. If the alias's error alarm fires during a deployment,
   CodeDeploy moves it back on its own.
 - **Approval:** production jobs wait for a reviewer, enforced by the GitHub `production`
-  environment (managed in personal_infra). Turning that off makes it pure CI/CD, with no
+  environment (managed in personal-infra). Turning that off makes it pure CI/CD, with no
   workflow change.
 - **No stored AWS keys:** each job signs in through GitHub's OIDC provider as its
   environment's deploy role. A role trusts only jobs in its own environment, so only
@@ -156,7 +156,7 @@ The stack files are identical in both environments; only `env.hcl` differs.
 
 The deploy workflow doesn't hard-code URLs or role ARNs. Each environment's
 `github-variables` stack publishes them to SSM Parameter Store at
-`/github/data-simulator-api/<environment>/<NAME>`, and personal_infra's GitHub stack turns
+`/github/data-simulator-api/<environment>/<NAME>`, and personal-infra's GitHub stack turns
 those into GitHub environment variables, read in the workflow as `vars.<NAME>`.
 
 The front door is its own stack. Another front door (for example API Gateway) would be

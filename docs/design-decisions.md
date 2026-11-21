@@ -112,7 +112,7 @@ rolls back if the alias's error alarm fires. Production also waits for an approv
 CloudFront is on its own Free plan, and idle Lambda costs nothing. CodeDeploy's built-in
 Lambda canary is free and replaces what would otherwise be hand-written traffic-shifting
 scripts. The approval lives in GitHub's environment settings, so dropping it (pure CI/CD)
-is a one-line change in personal_infra, with no workflow change.
+is a one-line change in personal-infra, with no workflow change.
 
 **Trade-off:** more moving parts than "terraform apply", and a merge takes about ten
 minutes to reach production. Configuration changes take effect with the next deploy,
@@ -127,7 +127,7 @@ can't run Terraform. Infrastructure is still applied by hand after reviewing the
 stronger protection. Code deploys are frequent and low-risk; infrastructure changes are
 rare and worth a human read. The deploy roles live in this repo, which is fine *because*
 applies are manual: a PR can't widen a role without someone applying it. If CI ever
-applies this repo's Terraform, the roles should move to personal_infra.
+applies this repo's Terraform, the roles should move to personal-infra.
 
 ## No API keys
 

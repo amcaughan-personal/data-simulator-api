@@ -1,5 +1,5 @@
 # Publishes values this repo's GitHub Actions need (URLs, role ARNs) to SSM Parameter
-# Store, at /github/<repo>/<environment>/<NAME>. personal_infra's GitHub stack turns every
+# Store, at /github/<repo>/<environment>/<NAME>. personal-infra's GitHub stack turns every
 # parameter under /github/ into a GitHub environment variable with that name, so workflows
 # read `vars.NAME` instead of hard-coding values. Only for values that aren't secret.
 
