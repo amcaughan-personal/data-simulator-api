@@ -28,4 +28,5 @@ inputs = {
   origin_secret = dependency.api_function.outputs.origin_secret
 
   requests_per_5_minutes_per_ip = local.env.requests_per_5_minutes_per_ip
+  url_parameter_name            = local.env.url_parameter_name
 }

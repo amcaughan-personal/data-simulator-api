@@ -156,3 +156,13 @@ resource "aws_pricingplanmanager_subscription" "free" {
     aws_wafv2_web_acl.this.arn,
   ]
 }
+
+# Other projects (e.g. data-simulator-elt) look the API up by this name instead of copying
+# its URL, so they follow it if the distribution is ever replaced.
+resource "aws_ssm_parameter" "url" {
+  #checkov:skip=CKV2_AWS_34:The value is the API's public URL, not a secret
+  name        = var.url_parameter_name
+  description = "Public base URL of ${var.name}"
+  type        = "String"
+  value       = "https://${aws_cloudfront_distribution.this.domain_name}/"
+}
