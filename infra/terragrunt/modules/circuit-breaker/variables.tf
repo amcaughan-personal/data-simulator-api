@@ -24,7 +24,7 @@ variable "max_invocations_per_day" {
 }
 
 variable "alert_topic_name" {
-  description = "Existing SNS topic (from personal_infra) that emails when the breaker trips."
+  description = "Existing SNS topic (from personal-infra) that emails when the breaker trips."
   type        = string
   default     = "security-alerts"
 }

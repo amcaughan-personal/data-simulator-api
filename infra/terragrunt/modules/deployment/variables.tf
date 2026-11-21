@@ -22,6 +22,6 @@ variable "github_repository" {
 }
 
 variable "github_environment" {
-  description = "Only workflow jobs in this GitHub environment can deploy (see personal_infra)."
+  description = "Only workflow jobs in this GitHub environment can deploy (see personal-infra)."
   type        = string
 }

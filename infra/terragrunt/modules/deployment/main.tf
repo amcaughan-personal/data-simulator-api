@@ -3,7 +3,7 @@
 # staging, a 10% canary in production). If the alias's error alarm fires during a
 # deployment, CodeDeploy moves the alias back.
 #
-# CI signs in through GitHub's OIDC provider (managed in personal_infra) as a role that
+# CI signs in through GitHub's OIDC provider (managed in personal-infra) as a role that
 # only jobs in this GitHub environment can use, and that can only deploy this function.
 
 data "aws_caller_identity" "current" {}
