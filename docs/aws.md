@@ -140,6 +140,7 @@ infra/terragrunt/
     front-door/cloudfront/      CloudFront + WAF + Free plan subscription
     circuit-breaker/            alarms + a Lambda that stops the function when they fire
     deployment/                 CodeDeploy + rollback alarm + the role CI deploys as
+    github-variables/           publishes values the deploy workflow needs (see below)
   live/
     prod/
       env.hcl                   everything that differs per environment (names, limits, rollout)
@@ -147,10 +148,16 @@ infra/terragrunt/
       front-door/               the public entry point; reads api-function's outputs
       circuit-breaker/          watches api-function
       deployment/               how code reaches the live alias
+      github-variables/         API_URL, DEPLOY_ROLE_ARN, FUNCTION_NAME for GitHub
     staging/                    the same stacks, with staging's env.hcl
 ```
 
 The stack files are identical in both environments; only `env.hcl` differs.
+
+The deploy workflow doesn't hard-code URLs or role ARNs. Each environment's
+`github-variables` stack publishes them to SSM Parameter Store at
+`/github/data-simulator-api/<environment>/<NAME>`, and personal_infra's GitHub stack turns
+those into GitHub environment variables, read in the workflow as `vars.<NAME>`.
 
 The front door is its own stack. Another front door (for example API Gateway) would be
 a module under `modules/front-door/` taking the same two inputs (`origin_domain`,

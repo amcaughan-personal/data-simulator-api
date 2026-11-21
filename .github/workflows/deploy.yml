@@ -5,7 +5,8 @@ name: deploy
 # environment requires it) with a canary, and smoke-test again.
 #
 # Infrastructure (Terraform) is applied by hand; this only ships code. To roll back,
-# re-run an earlier run of this workflow.
+# re-run an earlier run of this workflow. Each environment's API_URL, DEPLOY_ROLE_ARN and
+# FUNCTION_NAME are GitHub environment variables, published by the github-variables stack.
 
 on:
   push:
@@ -39,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: https://d3ede7d9l0upni.cloudfront.net
+      url: ${{ vars.API_URL }}
     permissions:
       contents: read
       id-token: write # to sign in to AWS as this environment's deploy role
@@ -51,17 +52,21 @@ jobs:
           path: dist
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::766316140501:role/data-simulator-api-staging-deploy
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
           aws-region: us-east-2
-      - run: scripts/deploy.sh data-simulator-api-staging dist/lambda.zip
-      - run: scripts/smoke-test.sh https://d3ede7d9l0upni.cloudfront.net
+      - run: scripts/deploy.sh "$FUNCTION_NAME" dist/lambda.zip
+        env:
+          FUNCTION_NAME: ${{ vars.FUNCTION_NAME }}
+      - run: scripts/smoke-test.sh "$API_URL"
+        env:
+          API_URL: ${{ vars.API_URL }}
 
   production:
     needs: staging
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://d1dfbd1pkurhz5.cloudfront.net
+      url: ${{ vars.API_URL }}
     permissions:
       contents: read
       id-token: write
@@ -73,7 +78,11 @@ jobs:
           path: dist
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::766316140501:role/data-simulator-api-deploy
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
           aws-region: us-east-2
-      - run: scripts/deploy.sh data-simulator-api dist/lambda.zip
-      - run: scripts/smoke-test.sh https://d1dfbd1pkurhz5.cloudfront.net
+      - run: scripts/deploy.sh "$FUNCTION_NAME" dist/lambda.zip
+        env:
+          FUNCTION_NAME: ${{ vars.FUNCTION_NAME }}
+      - run: scripts/smoke-test.sh "$API_URL"
+        env:
+          API_URL: ${{ vars.API_URL }}
