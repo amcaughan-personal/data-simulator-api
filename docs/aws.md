@@ -59,6 +59,7 @@ flowchart LR
 | CloudFront distribution | `front-door` | public HTTPS entry point | $0 (Free plan) |
 | WAF web ACL (2 rules) | `front-door` | rate limiting, bad-IP blocking | $0 (Free plan) |
 | CloudFront Free plan subscription | `front-door` | makes the two above flat-rate, with no overages | $0 |
+| SSM parameter `/services/data-simulator-api/<env>/url` | `front-door` | the public URL, for other projects to look up | free |
 | Lambda function + function URL | `api-function` | runs the API | per use, capped (below) |
 | IAM role | `api-function` | lets the function write its own logs, nothing else | free |
 | CloudWatch log group | `api-function` | function logs, kept 14 days | pennies |
@@ -153,7 +154,7 @@ infra/terragrunt/
   root.hcl                      S3 state backend, providers (incl. a us-east-1 alias for WAF), tags
   modules/
     api-function/               Lambda + function URL + log group + least-privilege role
-    front-door/cloudfront/      CloudFront + WAF + Free plan subscription
+    front-door/cloudfront/      CloudFront + WAF + Free plan subscription; publishes the URL
     circuit-breaker/            alarms + a Lambda that stops the function when they fire
     deployment/                 CodeDeploy + rollback alarm + the role CI deploys as
     smoke-test/                 a daily Synthetics canary running the smoke tests, and its alarm
@@ -177,10 +178,15 @@ The deploy workflow doesn't hard-code URLs or role ARNs. Each environment's
 `/github/data-simulator-api/<environment>/<NAME>`, and personal-infra's GitHub stack turns
 those into GitHub environment variables, read in the workflow as `vars.<NAME>`.
 
+Other projects find the API the same way: the `front-door` stack publishes the public URL
+at `/services/data-simulator-api/<environment>/url`, and
+[data-simulator-elt](https://github.com/amcaughan-personal/data-simulator-elt) looks it up
+there rather than copying it.
+
 The front door is its own stack. Another front door (for example API Gateway) would be
-a module under `modules/front-door/` taking the same two inputs (`origin_domain`,
-`origin_secret`), with each environment's `front-door` stack pointed at it. The function
-stack wouldn't change.
+a module under `modules/front-door/` taking the same inputs (`origin_domain`,
+`origin_secret`, `url_parameter_name`) and publishing its URL there too, with each
+environment's `front-door` stack pointed at it. The function stack wouldn't change.
 
 ## Changing infrastructure
 

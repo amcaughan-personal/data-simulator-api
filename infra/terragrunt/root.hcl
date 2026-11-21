@@ -17,7 +17,7 @@ locals {
   # that manages it: the repo, and the Terragrunt stack within it.
   common_tags = {
     Repo      = "amcaughan-personal/data-simulator-api"
-    Stack     = path_relative_to_include() # e.g. live/dev/api
+    Stack     = path_relative_to_include() # e.g. live/prod/api-function
     ManagedBy = "terragrunt"
     Owner     = "amcaughan"
   }

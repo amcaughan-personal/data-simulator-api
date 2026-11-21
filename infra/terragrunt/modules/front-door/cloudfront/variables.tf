@@ -18,3 +18,8 @@ variable "requests_per_5_minutes_per_ip" {
   type        = number
   default     = 100
 }
+
+variable "url_parameter_name" {
+  description = "SSM parameter the public URL is published to, for other projects to look up."
+  type        = string
+}
