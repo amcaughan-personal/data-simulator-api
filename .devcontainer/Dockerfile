@@ -43,5 +43,8 @@ ENV MISE_YES=1 \
 COPY --chown=dev .tool-versions /tmp/tool-versions/.tool-versions
 RUN cd /tmp/tool-versions && mise install && mise reshim && terraform version && terragrunt --version
 
+COPY --chown=dev .devcontainer/prompt.sh /home/dev/.prompt.sh
+RUN echo '. ~/.prompt.sh' >> /home/dev/.bashrc
+
 WORKDIR /workspace
 CMD ["/bin/bash"]
