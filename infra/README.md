@@ -11,12 +11,14 @@ terragrunt/
     front-door/cloudfront/      CloudFront + WAF on the CloudFront Free flat-rate plan
     circuit-breaker/            alarms + a Lambda that stops the function if it's overused
     deployment/                 CodeDeploy (canary + rollback) and the role CI deploys as
+    github-variables/           publishes the deploy workflow's settings for GitHub (via SSM)
   live/
     prod/                       production; env.hcl holds its names and limits
       api-function/             the function and its live alias
       front-door/               the public entry point (uses api-function's outputs)
       circuit-breaker/          watches api-function; re-apply api-function to reset it
       deployment/               how code reaches the live alias
+      github-variables/         API_URL, DEPLOY_ROLE_ARN, FUNCTION_NAME as GitHub variables
     staging/                    the same stacks, with staging's env.hcl
 ```
 
