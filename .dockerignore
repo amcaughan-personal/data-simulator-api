@@ -1,3 +1,5 @@
-# Docker builds use the repo root as context only to reach .tool-versions (see .devcontainer).
+# Docker builds use the repo root as context only to reach .tool-versions and the
+# dev container's prompt (see .devcontainer).
 *
 !.tool-versions
+!.devcontainer/prompt.sh
