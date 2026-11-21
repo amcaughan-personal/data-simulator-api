@@ -1,7 +1,7 @@
 # Infrastructure
 
 Terragrunt/Terraform for running the API on AWS. Applied manually from the local dev
-image (`local-dev/dev-shell.sh`); state lives in the shared bucket from `personal_infra`.
+container (`.devcontainer/`); state lives in the shared bucket from `personal_infra`.
 
 ```
 terragrunt/

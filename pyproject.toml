@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Generate realistic synthetic datasets from a small JSON spec."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115,<1",
     "mangum>=0.19,<1",
@@ -37,7 +37,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 110
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

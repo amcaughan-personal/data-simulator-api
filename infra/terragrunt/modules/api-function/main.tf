@@ -55,7 +55,7 @@ resource "aws_lambda_function" "this" {
   #checkov:skip=CKV_AWS_173:Default encryption is enough for the only env secret (the origin header value)
   function_name = var.function_name
   role          = aws_iam_role.this.arn
-  runtime       = "python3.12"
+  runtime       = "python3.14"
   architectures = ["arm64"]
   handler       = "data_simulator.lambda_handler.handler"
 

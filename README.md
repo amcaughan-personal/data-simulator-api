@@ -38,6 +38,15 @@ uv run uvicorn data_simulator.api.app:app --reload   # http://127.0.0.1:8000/doc
 uv run pytest
 ```
 
+uv uses the Python version in `.python-version`. For infrastructure work, open the repo in
+the dev container (VS Code: *Reopen in Container*): it has the AWS CLI and the Terraform,
+Terragrunt and uv versions from `.tool-versions`. Without VS Code:
+
+```bash
+docker build -f .devcontainer/Dockerfile -t data-simulator-api-dev .
+docker run --rm -it -v "$PWD:/workspace" -v "$HOME/.aws:/home/dev/.aws" data-simulator-api-dev
+```
+
 ## Repository layout
 
 ```
