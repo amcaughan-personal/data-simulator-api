@@ -16,8 +16,8 @@ variable "deployment_config" {
   type        = string
 }
 
-variable "github_repository" {
-  description = "owner/name of the repository whose workflows deploy."
+variable "oidc_subject_prefix" {
+  description = "The repository part of GitHub's OIDC subject claim (see the repo's OIDC settings)."
   type        = string
 }
 
