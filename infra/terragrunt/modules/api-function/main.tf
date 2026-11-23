@@ -59,8 +59,7 @@ resource "aws_lambda_function" "this" {
   architectures = ["arm64"]
   handler       = "data_simulator.lambda_handler.handler"
 
-  filename         = var.package_path
-  source_code_hash = filebase64sha256(var.package_path)
+  filename = var.package_path
 
   memory_size                    = var.memory_mb
   timeout                        = var.timeout_seconds
@@ -80,8 +79,9 @@ resource "aws_lambda_function" "this" {
   depends_on = [aws_iam_role_policy.logs]
 
   lifecycle {
-    # The package here is only for creating the function; deploys own the code after that.
-    ignore_changes = [filename, source_code_hash]
+    # The package here is only for creating the function (build it first with
+    # scripts/build-lambda.sh); deploys own the code after that.
+    ignore_changes = [filename]
   }
 }
 
