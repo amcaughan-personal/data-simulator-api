@@ -10,4 +10,4 @@ permissions:
 
 jobs:
   python:
-    uses: amcaughan-personal/shared-workflows/.github/workflows/python-checks.yml@87104af04a84c34e08b4190a0e82d1631ef128d5 # v1.0.0
+    uses: amcaughan-personal/shared-workflows/.github/workflows/python-checks.yml@ca831e0767bee9dd04d13fb18444c69c689ade6f # v2.3.0
