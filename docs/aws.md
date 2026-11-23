@@ -117,11 +117,13 @@ flowchart LR
   ever reaches the alias. In production the shift is a canary: 10% of requests for 5
   minutes, then all of them. If the alias's error alarm fires during a deployment,
   CodeDeploy moves it back on its own.
-- **Approval:** production jobs wait for a reviewer, enforced by the GitHub `production`
-  environment (managed in personal-infra). Turning that off makes it pure CI/CD, with no
-  workflow change.
+- **Approval:** the GitHub `production` environment (managed in personal-infra) can make
+  production jobs wait for a reviewer. It's off, so a merge ships all the way: pure CI/CD,
+  and turning it on needs no workflow change.
 - **No stored AWS keys:** each job signs in through GitHub's OIDC provider as its
-  environment's deploy role. A role trusts only jobs in its own environment, so only
+  environment's deploy role, defined in personal-infra
+  (`github-ci-roles/data-simulator-api/deploy-<environment>`), which also publishes its ARN as
+  `DEPLOY_ROLE_ARN`. A role trusts only jobs in its own environment, so only
   `main`, and in production only after approval, can get credentials. It can upload,
   publish and deploy that one function, and nothing else.
 - **Rolling back:** re-run an earlier run of the workflow (or let the alarm do it during
@@ -156,7 +158,7 @@ infra/terragrunt/
     api-function/               Lambda + function URL + log group + least-privilege role
     front-door/cloudfront/      CloudFront + WAF + Free plan subscription; publishes the URL
     circuit-breaker/            alarms + a Lambda that stops the function when they fire
-    deployment/                 CodeDeploy + rollback alarm + the role CI deploys as
+    deployment/                 CodeDeploy + rollback alarm
     smoke-test/                 a daily Synthetics canary running the smoke tests, and its alarm
     github-variables/           publishes values the deploy workflow needs (see below)
   live/
@@ -166,7 +168,7 @@ infra/terragrunt/
       front-door/               the public entry point; reads api-function's outputs
       circuit-breaker/          watches api-function
       deployment/               how code reaches the live alias
-      github-variables/         API_URL, DEPLOY_ROLE_ARN, FUNCTION_NAME for GitHub
+      github-variables/         API_URL, FUNCTION_NAME for GitHub
       smoke-test/               production only
     staging/                    the same stacks, with staging's env.hcl
 ```
@@ -174,7 +176,8 @@ infra/terragrunt/
 The stack files are identical in both environments; only `env.hcl` differs.
 
 The deploy workflow doesn't hard-code URLs or role ARNs. Each environment's
-`github-variables` stack publishes them to SSM Parameter Store at
+`github-variables` stack publishes the URL and function name (personal-infra publishes the
+deploy role's ARN) to SSM Parameter Store at
 `/github/data-simulator-api/<environment>/<NAME>`, and personal-infra's GitHub stack turns
 those into GitHub environment variables, read in the workflow as `vars.<NAME>`.
 

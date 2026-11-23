@@ -1,8 +1,3 @@
-output "deploy_role_arn" {
-  description = "Role the deploy workflow assumes for this environment."
-  value       = aws_iam_role.deploy.arn
-}
-
 output "codedeploy_app" {
   value = aws_codedeploy_app.this.name
 }

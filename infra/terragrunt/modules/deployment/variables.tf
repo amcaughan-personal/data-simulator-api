@@ -16,18 +16,13 @@ variable "deployment_config" {
   type        = string
 }
 
-variable "oidc_subject_prefix" {
-  description = "The repository part of GitHub's OIDC subject claim (see the repo's OIDC settings)."
-  type        = string
-}
-
 variable "alert_topic_name" {
   description = "Existing SNS topic (from personal-infra) to email when the error alarm fires; null for no email."
   type        = string
   default     = null
 }
 
-variable "github_environment" {
-  description = "Only workflow jobs in this GitHub environment can deploy (see personal-infra)."
+variable "permissions_boundary_name" {
+  description = "IAM policy attached as the permissions boundary of the roles this module creates."
   type        = string
 }

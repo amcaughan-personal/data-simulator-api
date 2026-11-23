@@ -24,21 +24,13 @@ dependency "front_door" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
-dependency "deployment" {
-  config_path = "../deployment"
-
-  mock_outputs                            = { deploy_role_arn = "arn:aws:iam::000000000000:role/mock" }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
-}
-
 inputs = {
   github_repository  = "data-simulator-api"
   github_environment = local.env.github_environment
 
   # Read by .github/workflows/deploy.yml as vars.<NAME>.
   variables = {
-    API_URL         = trimsuffix(dependency.front_door.outputs.url, "/")
-    DEPLOY_ROLE_ARN = dependency.deployment.outputs.deploy_role_arn
-    FUNCTION_NAME   = dependency.api_function.outputs.function_name
+    API_URL       = trimsuffix(dependency.front_door.outputs.url, "/")
+    FUNCTION_NAME = dependency.api_function.outputs.function_name
   }
 }

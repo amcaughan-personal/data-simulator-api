@@ -3,18 +3,10 @@
 # staging, a 10% canary in production). If the alias's error alarm fires during a
 # deployment, CodeDeploy moves the alias back.
 #
-# CI signs in through GitHub's OIDC provider (managed in personal-infra) as a role that
-# only jobs in this GitHub environment can use, and that can only deploy this function.
+# The role CI deploys as lives in personal-infra (github-ci-roles/data-simulator-api/deploy-*),
+# so this repo's CI applies can't change who deploys.
 
 data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-data "aws_partition" "current" {}
-
-locals {
-  account = data.aws_caller_identity.current.account_id
-  region  = data.aws_region.current.region
-  arn     = "arn:${data.aws_partition.current.partition}"
-}
 
 # --------------------------------------------------------------------------------------
 # Errors from the live alias: failed invocations, plus requests answered with a 5xx (an
@@ -95,9 +87,12 @@ data "aws_iam_policy_document" "codedeploy" {
   }
 }
 
+# Carries personal-infra's permissions boundary for this repo, like every role here: CI
+# applies can create and change roles only with it, and it caps what they can do.
 resource "aws_iam_role" "codedeploy" {
-  name               = "${var.function_name}-codedeploy"
-  assume_role_policy = data.aws_iam_policy_document.codedeploy_assume.json
+  name                 = "${var.function_name}-codedeploy"
+  assume_role_policy   = data.aws_iam_policy_document.codedeploy_assume.json
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.permissions_boundary_name}"
 }
 
 resource "aws_iam_role_policy" "codedeploy" {
@@ -131,84 +126,4 @@ resource "aws_codedeploy_deployment_group" "live" {
     enabled = true
     events  = ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM"]
   }
-}
-
-# --------------------------------------------------------------------------------------
-# The role CI deploys as
-# --------------------------------------------------------------------------------------
-
-data "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
-}
-
-data "aws_iam_policy_document" "deploy_assume" {
-  statement {
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-    principals {
-      type        = "Federated"
-      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-    # Only jobs in this GitHub environment (which allows only main, and in production
-    # waits for approval) get these credentials.
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["${var.oidc_subject_prefix}:environment:${var.github_environment}"]
-    }
-  }
-}
-
-data "aws_iam_policy_document" "deploy" {
-  statement {
-    sid = "UploadAndPublishCode"
-    actions = [
-      "lambda:UpdateFunctionCode",
-      "lambda:PublishVersion",
-      "lambda:GetFunction",
-      "lambda:GetFunctionConfiguration",
-      "lambda:GetAlias",
-    ]
-    resources = [var.function_arn, "${var.function_arn}:*"]
-  }
-  statement {
-    # Only for the first deploy, when the alias still points at $LATEST and there is no
-    # version for CodeDeploy to shift from. Lambda authorizes UpdateAlias against the
-    # function's ARN.
-    sid       = "PointNewAlias"
-    actions   = ["lambda:UpdateAlias"]
-    resources = [var.function_arn]
-  }
-  statement {
-    sid       = "StartAndWatchDeployments"
-    actions   = ["codedeploy:CreateDeployment", "codedeploy:GetDeployment"]
-    resources = [aws_codedeploy_deployment_group.live.arn]
-  }
-  statement {
-    sid       = "ReadDeploymentConfig"
-    actions   = ["codedeploy:GetDeploymentConfig"]
-    resources = ["${local.arn}:codedeploy:${local.region}:${local.account}:deploymentconfig:${var.deployment_config}"]
-  }
-  statement {
-    sid       = "RegisterRevision"
-    actions   = ["codedeploy:RegisterApplicationRevision", "codedeploy:GetApplicationRevision"]
-    resources = [aws_codedeploy_app.this.arn]
-  }
-}
-
-resource "aws_iam_role" "deploy" {
-  name                 = "${var.function_name}-deploy"
-  description          = "GitHub Actions deploys of ${var.function_name} (environment ${var.github_environment})"
-  assume_role_policy   = data.aws_iam_policy_document.deploy_assume.json
-  max_session_duration = 3600
-}
-
-resource "aws_iam_role_policy" "deploy" {
-  name   = "deploy-${var.function_name}"
-  role   = aws_iam_role.deploy.id
-  policy = data.aws_iam_policy_document.deploy.json
 }

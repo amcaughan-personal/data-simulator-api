@@ -22,6 +22,13 @@ locals {
   }
 }
 
+# personal-infra's boundary for this repo's IAM roles (see its github-ci-apply-role module).
+# Every module that creates a role attaches it, except smoke-test's canary role, which is
+# outside CI's reach (that stack is applied by hand).
+inputs = {
+  permissions_boundary_name = "github-ci-boundary-data-simulator-api"
+}
+
 remote_state {
   backend = "s3"
 

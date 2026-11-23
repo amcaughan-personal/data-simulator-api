@@ -1,6 +1,8 @@
 # Circuit breaker: if the API is invoked far more than normal, stop it (reserved
 # concurrency 0) and email. The front door already caps cost per IP; this caps it overall.
 
+data "aws_caller_identity" "current" {}
+
 data "aws_sns_topic" "alerts" {
   name = var.alert_topic_name
 }
@@ -43,9 +45,12 @@ data "aws_iam_policy_document" "breaker" {
   }
 }
 
+# Carries personal-infra's permissions boundary for this repo, like every role here: CI
+# applies can create and change roles only with it, and it caps what they can do.
 resource "aws_iam_role" "breaker" {
-  name               = "${var.name}-role"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
+  name                 = "${var.name}-role"
+  assume_role_policy   = data.aws_iam_policy_document.assume.json
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.permissions_boundary_name}"
 }
 
 resource "aws_iam_role_policy" "breaker" {
