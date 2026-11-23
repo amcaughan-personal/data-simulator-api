@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   plan:
-    uses: amcaughan-personal/shared-workflows/.github/workflows/terragrunt-plan.yml@ca831e0767bee9dd04d13fb18444c69c689ade6f # v2.3.0
+    uses: amcaughan-personal/shared-workflows/.github/workflows/terragrunt-plan.yml@f0f0d6e584ed0188191247c0e608893c9b12fe04 # v2.3.1
     with:
       aws_region: us-east-2
       report_title: "Drift check"
