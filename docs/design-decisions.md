@@ -13,7 +13,7 @@ Why the API is built the way it is, and what each choice gives up.
 - [An origin secret instead of IAM auth on the function URL](#an-origin-secret-instead-of-iam-auth-on-the-function-url)
 - [A circuit breaker that needs a human to reset](#a-circuit-breaker-that-needs-a-human-to-reset)
 - [Staging, versions and a canary](#staging-versions-and-a-canary)
-- [CI ships code; people apply infrastructure](#ci-ships-code-people-apply-infrastructure)
+- [CI ships code and applies infrastructure, but never deletes](#ci-ships-code-and-applies-infrastructure-but-never-deletes)
 - [No API keys](#no-api-keys)
 - [Staging, but no dev environment](#staging-but-no-dev-environment)
 - [Small, reproducible build](#small-reproducible-build)
@@ -118,16 +118,20 @@ is a one-line change in personal-infra, with no workflow change.
 minutes to reach production. Configuration changes take effect with the next deploy,
 because a version keeps the configuration it was published with.
 
-## CI ships code; people apply infrastructure
+## CI ships code and applies infrastructure, but never deletes
 
-**Decision:** the deploy workflow can upload code and move the alias for one function. It
-can't run Terraform. Infrastructure is still applied by hand after reviewing the plan.
+**Decision:** the deploy workflow uploads code and moves the alias for one function.
+Infrastructure changes are planned on the pull request and applied from `main` by CI,
+staging first, prod after approval. CI's apply role can create and change this repo's
+resources but not delete them; destroys, and the few things listed in
+[AWS architecture](aws.md#changing-infrastructure), are applied by hand.
 
-**Why:** a role that can apply Terraform can grant itself anything, so it would need much
-stronger protection. Code deploys are frequent and low-risk; infrastructure changes are
-rare and worth a human read. The deploy roles live in this repo, which is fine *because*
-applies are manual: a PR can't widen a role without someone applying it. If CI ever
-applies this repo's Terraform, the roles should move to personal-infra.
+**Why:** a role that can apply Terraform could grant itself anything, so its limits come from
+outside this repo. All of CI's roles are defined in personal-infra: the deploy roles, the
+read-only plan role, and the apply role, which can act only on `data-simulator-api*` resources
+(CloudFront distributions by their `Repo` tag) and can create roles only with a permissions
+boundary capping them at this repo's logs, alias and throttle. A PR here can't widen any of
+them. Deletes are where a mistake costs the most, so they keep a person in the loop.
 
 ## No API keys
 

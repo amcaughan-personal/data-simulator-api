@@ -4,14 +4,14 @@ name: deploy
 # then deploy the same package to production (after approval, if the production
 # environment requires it) with a canary, and smoke-test again.
 #
-# Infrastructure (Terraform) is applied by hand; this only ships code. To roll back,
+# Infrastructure is applied by terragrunt-apply.yml; this only ships code. To roll back,
 # re-run an earlier run of this workflow. Each environment's API_URL and FUNCTION_NAME come
 # from the github-variables stack, and DEPLOY_ROLE_ARN from personal-infra's deploy role stack.
 
 on:
   push:
     branches: [main]
-    # Infrastructure is applied by hand, and docs change nothing deployed.
+    # Infrastructure has its own workflow, and docs change nothing deployed.
     paths-ignore: ["docs/**", "**/*.md", "infra/**"]
   workflow_dispatch:
 
