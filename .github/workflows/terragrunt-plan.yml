@@ -1,7 +1,8 @@
 name: terragrunt-plan
 
 # Plans every Terragrunt stack on pull requests that touch infrastructure, and comments
-# the changes (addresses and types only; this repo is public). Applies stay manual.
+# the changes (addresses and types only; this repo is public). terragrunt-apply applies
+# them after merging.
 
 on:
   pull_request:

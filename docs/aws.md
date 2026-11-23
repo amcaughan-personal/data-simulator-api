@@ -193,7 +193,21 @@ environment's `front-door` stack pointed at it. The function stack wouldn't chan
 
 ## Changing infrastructure
 
-Infrastructure is applied by hand, plan first, staging before production:
+Pull requests that touch `infra/` get the plan as a comment. After merging,
+[terragrunt-apply](../.github/workflows/terragrunt-apply.yml) applies staging, plans prod into
+the run's summary, and applies prod once approved (the `infra-production` environment). Its
+role (personal-infra's `github-ci-apply-data-simulator-api`) can create and change this repo's
+resources but never delete them, and its own roles only with this repo's permissions boundary.
+
+These still need a hand apply, and stop the CI run if a plan includes them:
+
+- anything that destroys or replaces a resource;
+- creating the API function (its package comes from `scripts/build-lambda.sh`, below) or a
+  CloudFront distribution, and changes to the flat-rate pricing plan;
+- the `smoke-test` stack: Synthetics creates the canary's Lambda with the caller's
+  credentials, which is more than CI's role is given.
+
+By hand, in the dev container, plan first, staging before production:
 
 ```bash
 # in the dev container (VS Code: Reopen in Container, or see the README)

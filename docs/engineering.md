@@ -78,9 +78,10 @@ Details: [AWS architecture: cost bounds](aws.md#cost-bounds).
 
 Everything runs from Terraform, organised with Terragrunt into small stacks (function, front
 door, circuit breaker, deployment) per environment, with an `env.hcl` holding the only
-differences between staging and production. Changes are applied by hand from a reviewed plan;
-CI ships code but can't change infrastructure. Pull requests that touch it get the plan as a
-comment, and a [daily drift check](../.github/workflows/drift.yml) plans `main` read-only and
+differences between staging and production. Pull requests that touch it get the plan as a
+comment; after merging, [terragrunt-apply](../.github/workflows/terragrunt-apply.yml) applies
+staging, then prod once approved, and never deletes anything (destroys are applied by hand).
+A [daily drift check](../.github/workflows/drift.yml) plans `main` read-only and
 fails if AWS doesn't match it (a change made outside Terraform, or one merged but not applied).
 See [AWS architecture](aws.md#infrastructure-as-code).
 
