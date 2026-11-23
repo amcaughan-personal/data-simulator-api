@@ -22,14 +22,9 @@ dependency "api_function" {
 }
 
 inputs = {
-  function_name      = dependency.api_function.outputs.function_name
-  function_arn       = dependency.api_function.outputs.function_arn
-  alias_name         = dependency.api_function.outputs.alias_name
-  deployment_config  = local.env.deployment_config
-  github_environment = local.env.github_environment
-  alert_topic_name   = local.env.alert_topic_name
-
-  # GitHub's immutable subject: the org and repo by name and numeric ID. A repo deleted and
-  # recreated under the same name gets a new ID, so its tokens can't assume this role.
-  oidc_subject_prefix = "repo:amcaughan-personal@271645414/data-simulator-api@1179137908"
+  function_name     = dependency.api_function.outputs.function_name
+  function_arn      = dependency.api_function.outputs.function_arn
+  alias_name        = dependency.api_function.outputs.alias_name
+  deployment_config = local.env.deployment_config
+  alert_topic_name  = local.env.alert_topic_name
 }

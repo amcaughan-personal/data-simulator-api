@@ -5,8 +5,8 @@ name: deploy
 # environment requires it) with a canary, and smoke-test again.
 #
 # Infrastructure (Terraform) is applied by hand; this only ships code. To roll back,
-# re-run an earlier run of this workflow. Each environment's API_URL, DEPLOY_ROLE_ARN and
-# FUNCTION_NAME are GitHub environment variables, published by the github-variables stack.
+# re-run an earlier run of this workflow. Each environment's API_URL and FUNCTION_NAME come
+# from the github-variables stack, and DEPLOY_ROLE_ARN from personal-infra's deploy role stack.
 
 on:
   push:

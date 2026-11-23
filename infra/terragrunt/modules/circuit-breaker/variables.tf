@@ -28,3 +28,8 @@ variable "alert_topic_name" {
   type        = string
   default     = "security-alerts"
 }
+
+variable "permissions_boundary_name" {
+  description = "IAM policy attached as the permissions boundary of the roles this module creates."
+  type        = string
+}

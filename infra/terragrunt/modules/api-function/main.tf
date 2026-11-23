@@ -7,6 +7,8 @@
 # stack). Configuration changes made here reach traffic with the next deploy, because
 # each published version keeps the configuration it was published with.
 
+data "aws_caller_identity" "current" {}
+
 resource "random_password" "origin_secret" {
   length  = 48
   special = false
@@ -36,9 +38,12 @@ data "aws_iam_policy_document" "logs" {
   }
 }
 
+# Carries personal-infra's permissions boundary for this repo, like every role here: CI
+# applies can create and change roles only with it, and it caps what they can do.
 resource "aws_iam_role" "this" {
-  name               = "${var.function_name}-role"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
+  name                 = "${var.function_name}-role"
+  assume_role_policy   = data.aws_iam_policy_document.assume.json
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.permissions_boundary_name}"
 }
 
 resource "aws_iam_role_policy" "logs" {
