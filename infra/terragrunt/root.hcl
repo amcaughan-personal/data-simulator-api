@@ -10,8 +10,7 @@ locals {
     if length(regexall("^[a-z]", trimspace(line))) > 0
   }
 
-  aws_region  = "us-east-2"
-  aws_profile = "default"
+  aws_region = "us-east-2"
 
   # On every taggable resource, so anything in the console points back to the code
   # that manages it: the repo, and the Terragrunt stack within it.
@@ -47,7 +46,6 @@ variable "extra_default_tags" {
 
 provider "aws" {
   region  = "${local.aws_region}"
-  profile = "${local.aws_profile}"
 
   default_tags {
     tags = merge(${jsonencode(local.common_tags)}, var.extra_default_tags)
@@ -58,7 +56,6 @@ provider "aws" {
 provider "aws" {
   alias   = "us_east_1"
   region  = "us-east-1"
-  profile = "${local.aws_profile}"
 
   default_tags {
     tags = merge(${jsonencode(local.common_tags)}, var.extra_default_tags)

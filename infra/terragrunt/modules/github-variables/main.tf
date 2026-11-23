@@ -4,7 +4,7 @@
 # read `vars.NAME` instead of hard-coding values. Only for values that aren't secret.
 
 resource "aws_ssm_parameter" "this" {
-  #checkov:skip=CKV2_AWS_34:Not secrets: URLs and ARNs that workflow logs show anyway
+  #checkov:skip=CKV2_AWS_34:Not secrets: URLs and ARNs; GitHub masks the ARNs in workflow logs
   for_each = var.variables
 
   name        = "/github/${var.github_repository}/${var.github_environment}/${each.key}"
